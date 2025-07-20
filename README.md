@@ -1,5 +1,7 @@
 #
 
+![RayfallLogo](static/rayfall.png)
+
 # Rayfall: QRZ Logbook Map Viewer
 
 Rayfall is a dynamic ham radio mapping interface that pulls your logbook data from QRZ and plots your QSOs on an interactive Leaflet map. You can explore contacts by date range, filter by band and mode, and visually analyze your contacts across different locations and timeframes.
