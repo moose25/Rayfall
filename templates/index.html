@@ -147,7 +147,23 @@
     </div>
   </div>
 
+  <div id="apiModal" style="display:none; position:fixed; top:30%; left:50%; transform:translate(-50%,-50%);
+    background:#1e234d; padding:20px; border-radius:8px; box-shadow:0 0 10px #000; z-index:1000;">
+    <label for="apiKeyInput">Enter QRZ API Key:</label><br>
+    <input type="text" id="apiKeyInput" style="width:100%; margin:10px 0;"><br>
+    <button onclick="saveApiKey()">Save</button>
+    <button onclick="closeApiModal()">Cancel</button>
+    </div>
+    <div style="position:absolute; top:10px; right:10px;">
+    <button onclick="openApiModal()">Change API Key</button>
+  </div>
+
+
   <div id="map"></div>
+
+  <div style="text-align:center; color:grey; margin-top:8px; font-size:14px;">
+  Created by N2CLW
+  </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
@@ -193,115 +209,176 @@
     baseLayers.dark.addTo(map);
 
     function switchBaseMap(key) {
-      Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
-      baseLayers[key].addTo(map);
+    Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+    baseLayers[key].addTo(map);
     }
 
-    let qthMarker = L.marker([39.0374, -77.408967], {
-      icon: L.divIcon({ className: 'custom-qth-icon', html: '⭐', iconSize: [20, 20] })
-    }).addTo(map);
+    let qthMarker = null;
 
     function loadQSOs() {
-      const start = document.getElementById("start").value;
-      const end = document.getElementById("end").value;
-      if (!start || !end) return alert("Please select a start and end date.");
+    const start = document.getElementById("start").value;
+    const end = document.getElementById("end").value;
+    const apiKey = localStorage.getItem("qrzApiKey");
 
-      fetch(`/api/logs?start=${start}&end=${end}`)
-        .then(response => response.json())
+    if (!apiKey) {
+        alert("Please set your QRZ API key first.");
+        return;
+    }
+
+    if (!start || !end) {
+        alert("Please select a start and end date.");
+        return;
+    }
+
+    fetch(`/api/logs?start=${start}&end=${end}`, {
+        headers: { "x-api-key": apiKey }
+    })
+        .then(res => res.json())
         .then(data => {
-          clearMap();
-          populateFilters(data.qsos);
-          plotQSOs(data.qsos);
+        clearMap();
+        populateFilters(data.qsos);
+        plotQSOs(data.qsos);
         });
     }
 
     function clearMap() {
-      markers.forEach(m => map.removeLayer(m));
-      lines.forEach(l => map.removeLayer(l));
-      markers = [];
-      lines = [];
+    markers.forEach(m => map.removeLayer(m));
+    lines.forEach(l => map.removeLayer(l));
+    markers = [];
+    lines = [];
     }
 
     function populateFilters(qsos) {
-      const bandSet = new Set();
-      const modeSet = new Set();
-      currentQSOs = qsos;
+    currentQSOs = qsos;
 
-      qsos.forEach(q => {
-        if (q.band) bandSet.add(q.band);
+    const bandSet = new Set();
+    const modeSet = new Set();
+
+    qsos.forEach(q => {
+        if (q.band) bandSet.add(q.band.toLowerCase());
         if (q.mode) modeSet.add(q.mode);
-      });
+    });
 
-      const bandFilters = document.getElementById("bandFilters");
-      bandFilters.innerHTML = "";
-      bandSet.forEach(band => {
+    const bandFilters = document.getElementById("bandFilters");
+    bandFilters.innerHTML = "";
+    Array.from(bandSet).sort().forEach(band => {
         const color = bandColors[band] || "#999";
         const label = document.createElement("label");
-        label.innerHTML = `<span class="color-dot" style="background-color:${color}"></span><input type="checkbox" checked value="${band}" onchange="filterQSOs()"> ${band}`;
+        label.innerHTML = `<span class="color-dot" style="background-color:${color}"></span>
+        <input type="checkbox" checked value="${band}" onchange="filterQSOs()"> ${band}`;
         bandFilters.appendChild(label);
-      });
+    });
 
-      const modeFilters = document.getElementById("modeFilters");
-      modeFilters.innerHTML = "";
-      modeSet.forEach(mode => {
+    const modeFilters = document.getElementById("modeFilters");
+    modeFilters.innerHTML = "";
+    Array.from(modeSet).sort().forEach(mode => {
         const label = document.createElement("label");
         label.innerHTML = `<input type="checkbox" checked value="${mode}" onchange="filterQSOs()"> ${mode}`;
         modeFilters.appendChild(label);
-      });
+    });
+    }
+
+    function openApiModal() {
+    document.getElementById("apiKeyInput").value = localStorage.getItem("qrzApiKey") || "";
+    document.getElementById("apiModal").style.display = "block";
+    }
+
+    function closeApiModal() {
+    document.getElementById("apiModal").style.display = "none";
+    }
+
+    function saveApiKey() {
+    const key = document.getElementById("apiKeyInput").value.trim();
+    if (key) {
+        localStorage.setItem("qrzApiKey", key);
+        alert("API Key saved.");
+    }
+    closeApiModal();
     }
 
     function plotQSOs(qsos) {
-      document.getElementById("qsoCount").textContent = qsos.length;
-      qsos.forEach(qso => {
+    document.getElementById("qsoCount").textContent = qsos.length;
+    placeQTHMarkerFromLogs(qsos);
+
+    qsos.forEach(qso => {
         if (!qso.lat || !qso.lon) return;
 
         const useBandColor = document.getElementById("colorByBand").checked;
-        const markerColor = useBandColor ? (bandColors[qso.band] || "#000") : "#3399FF";
+        const band = (qso.band || "").toLowerCase();
+        const markerColor = useBandColor ? (bandColors[band] || "#3399FF") : "#3399FF";
 
         const svgIcon = L.divIcon({
-          className: "",
-          html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
+        className: "",
+        html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
             <path d="M12 0C5.4 0 0 5.4 0 12c0 7.5 12 24 12 24s12-16.5 12-24C24 5.4 18.6 0 12 0z" fill="${markerColor}" stroke="#000" stroke-width="1"/>
             <circle cx="12" cy="12" r="5" fill="#fff"/></svg>`,
-          iconSize: [24, 36],
-          iconAnchor: [12, 36],
-          popupAnchor: [0, -36]
+        iconSize: [24, 36],
+        iconAnchor: [12, 36],
+        popupAnchor: [0, -36]
         });
 
+        const popupHtml = `
+        <div style="line-height: 1.5;">
+            <b>Call:</b> ${qso.call}<br>
+            <b>Band:</b> ${qso.band}<br>
+            <b>Mode:</b> ${qso.mode}<br>
+            <b>Date:</b> ${qso.qso_date}<br>
+            <b>Time:</b> ${qso.time_on}<br>
+            ${qso.gridsquare ? `<b>Grid:</b> ${qso.gridsquare}<br>` : ''}
+            ${qso.state ? `<b>State:</b> ${qso.state}<br>` : ''}
+            ${qso.country ? `<b>Country:</b> ${qso.country}<br>` : ''}
+            ${qso.distance ? `<b>Distance:</b> ${qso.distance} mi` : ''}
+        </div>`;
+
         const marker = L.marker([qso.lat, qso.lon], { icon: svgIcon })
-          .bindPopup(`<b>${qso.call}</b><br>${qso.band}, ${qso.mode}<br>${qso.qso_date} ${qso.time_on}`);
+        .bindPopup(popupHtml);
 
         marker.qso = qso;
-
         marker.addTo(map);
         markers.push(marker);
 
         if (document.getElementById("showLines").checked && qso.lat && qso.lon) {
-            const outline = L.polyline([
-            [qso.my_lat, qso.my_lon],
-            [qso.lat, qso.lon]
-            ], {
-            color: "grey",
-            weight: 2,
-            opacity: 1
-            }).addTo(map);
-
-            lines.push(outline);
+        const outline = L.polyline(
+            [[qso.my_lat, qso.my_lon], [qso.lat, qso.lon]],
+            { color: "grey", weight: 2, opacity: 1 }
+        ).addTo(map);
+        lines.push(outline);
         }
-      });
+    });
+    }
+
+    function placeQTHMarkerFromLogs(qsos) {
+    const firstValid = qsos.find(qso => qso.my_lat && qso.my_lon);
+    if (firstValid) {
+        if (qthMarker) map.removeLayer(qthMarker);
+        qthMarker = L.marker([firstValid.my_lat, firstValid.my_lon], {
+        icon: L.divIcon({
+            className: 'custom-qth-icon',
+            html: '<div style="font-size: 32px; text-shadow: 1px 1px 4px black;">⚡</div>',
+            iconSize: [24, 24],
+            iconAnchor: [16, 16]
+        }),
+        zIndexOffset: 1000
+        }).addTo(map);
+    }
     }
 
     function filterQSOs() {
-      const selectedBands = Array.from(document.querySelectorAll("#bandFilters input:checked")).map(cb => cb.value);
-      const selectedModes = Array.from(document.querySelectorAll("#modeFilters input:checked")).map(cb => cb.value);
-      const filtered = currentQSOs.filter(q => selectedBands.includes(q.band) && selectedModes.includes(q.mode));
-      clearMap();
-      plotQSOs(filtered);
+    const selectedBands = Array.from(document.querySelectorAll("#bandFilters input:checked")).map(cb => cb.value.toLowerCase());
+    const selectedModes = Array.from(document.querySelectorAll("#modeFilters input:checked")).map(cb => cb.value);
+    const filtered = currentQSOs.filter(q =>
+        selectedBands.includes((q.band || "").toLowerCase()) &&
+        selectedModes.includes(q.mode)
+    );
+    document.getElementById("qsoCount").textContent = filtered.length;
+    clearMap();
+    plotQSOs(filtered);
     }
 
     function toggleLines() {
-      filterQSOs();
+    filterQSOs();
     }
+
   </script>
 </body>
 </html>

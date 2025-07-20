@@ -1,10 +1,8 @@
-from fastapi import FastAPI, Query
-import subprocess
-import re
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, HTTPException, Request, Header
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+import subprocess
 
 app = FastAPI()
 
@@ -17,9 +15,6 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/", response_class=HTMLResponse)
 async def serve_home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
-
-
-QRZ_API_KEY = ""
 
 def dms_to_decimal(coord_str):
     """
@@ -55,7 +50,6 @@ def parse_adif_block(adif_text: str):
                     key = key_parts[0].lower()
                     qso[key] = value.strip()
         if qso:
-            # Extract and convert only the desired fields
             filtered_qso = {
                 "call": qso.get("call"),
                 "band": qso.get("band"),
@@ -76,20 +70,27 @@ def parse_adif_block(adif_text: str):
     return parsed_qsos
 
 @app.get("/api/logs")
-def get_logs(start: str = Query(...), end: str = Query(...)):
+def get_logs(
+    start: str = Query(...),
+    end: str = Query(...),
+    x_api_key: str = Header(default=None)
+):
+    if not x_api_key:
+        raise HTTPException(status_code=400, detail="Missing x-api-key header")
+
     start_datetime = f"{start}T00:00:00"
     end_datetime = f"{end}T23:59:59"
 
     command = [
         "curl", "-X", "POST", "https://logbook.qrz.com/api",
-        "-d", f"KEY={QRZ_API_KEY}",
+        "-d", f"KEY={x_api_key}",
         "-d", "ACTION=FETCH",
         "-d", f"OPTION=BETWEEN:{start}+{end}"
     ]
 
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        output = result.stdout.strip()
+        result = subprocess.run(command, capture_output=True, text=False, check=True)
+        output = result.stdout.decode("latin-1").strip()
 
         if "RESULT=FAIL" in output or "COUNT=0" in output:
             return {
