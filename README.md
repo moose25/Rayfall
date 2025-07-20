@@ -24,7 +24,7 @@ Rayfall is a dynamic ham radio mapping interface that pulls your logbook data fr
 
 ## Screenshot
 
-&#x20;
+![RayfallScreenshot](images/rayfallScreenshot.png)
 
 ---
 
