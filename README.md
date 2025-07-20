@@ -1,6 +1,8 @@
 #
 
-![RayfallLogo](static/rayfall.png)
+<p align="center">
+  <img src="static/rayfall.png" alt="RayfallLogo" height="100">
+</p>
 
 # Rayfall: QRZ Logbook Map Viewer
 
@@ -26,7 +28,7 @@ Rayfall is a dynamic ham radio mapping interface that pulls your logbook data fr
 
 ## Screenshot
 
-![RayfallScreenshot](images/rayfallScreenshot.png)
+![RayfallScreenshot](static/rayfallScreenshot.png)
 
 ---
 
@@ -115,7 +117,7 @@ Rayfall centers on VA by default. Once a valid log is loaded, it updates to your
 If you'd like to hardcode a default starting location, edit:
 
 ```js
-map = L.map('map').setView([39.0374, -77.408967], 4);
+map = L.map('map').setView([XXX, XXX], 4);
 ```
 
 
@@ -129,12 +131,12 @@ Edit the styles directly in the `<style>` block inside `index.html`. All control
 
 ```
 rayfall/
-├── main.py                  # FastAPI backend
+├── main.py                 # FastAPI backend
 ├── templates/
 │   └── index.html          # Frontend map UI
 ├── static/
 │   ├── rayfall.png         # Logo
-│   └── screenshot.png      # Optional screenshot
+│   └── screenshot.png      # Screenshot
 ├── requirements.txt        # Python dependencies
 └── README.md               # You're reading this
 ```
