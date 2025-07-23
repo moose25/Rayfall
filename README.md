@@ -10,6 +10,7 @@ Rayfall is a dynamic ham radio mapping interface that pulls your logbook data fr
 
 > **Built by N2CLW**
 
+## Available at [rayfall.me](https://rayfall.me)
 ---
 
 ## Features
