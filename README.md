@@ -44,7 +44,7 @@ Rayfall is a dynamic ham radio mapping interface that pulls your logbook data fr
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/rayfall.git
+git clone https://github.com/moose25/rayfall.git
 cd rayfall
 ```
 
