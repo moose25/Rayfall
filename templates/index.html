@@ -136,6 +136,22 @@
             <option value="streets">Streets</option>
           </select>
         </label>
+        <label class="lines-toggle">
+          <input type="checkbox" id="showGridSquares" onchange="toggleGridSquares()" /> Show Grid Squares
+        </label>
+        <label>
+          <select id="gridPrecision" onchange="updateGridPrecision()">
+            <option value="4">4-char grids</option>
+            <option value="6" selected>6-char grids</option>
+          </select>
+        </label>
+        <label class="lines-toggle">
+          <input type="checkbox" id="showPins" checked onchange="togglePins()" /> Show Pins
+        </label>
+        <label class="lines-toggle">
+          <input type="checkbox" id="showQTH" checked onchange="toggleQTH()" /> Show QTH
+        </label>
+        <button onclick="exportMap()">Export Map (300 DPI)</button>
       </div>
       <div class="filter-row">
         <div><strong>QSOs shown: <span id="qsoCount">0</span></strong></div>
@@ -172,10 +188,13 @@
   </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
     let map = L.map('map').setView([39.0374, -77.408967], 4);
     let markers = [];
     let lines = [];
+    let gridSquares = [];
+    let workedGrids = new Set();
     let currentQSOs = [];
     let bandColors = {
         "6m": "#FA0F0F",
@@ -250,8 +269,10 @@
     function clearMap() {
     markers.forEach(m => map.removeLayer(m));
     lines.forEach(l => map.removeLayer(l));
+    gridSquares.forEach(g => map.removeLayer(g));
     markers = [];
     lines = [];
+    gridSquares = [];
     }
 
     function populateFilters(qsos) {
@@ -306,6 +327,23 @@
     document.getElementById("qsoCount").textContent = qsos.length;
     placeQTHMarkerFromLogs(qsos);
 
+    // Collect worked grid squares with selected precision
+    const gridPrecision = parseInt(document.getElementById("gridPrecision").value);
+    workedGrids.clear();
+    qsos.forEach(qso => {
+        if (qso.gridsquare) {
+          // Take first 4 or 6 characters of grid square based on selection
+          const grid = qso.gridsquare.substring(0, Math.min(gridPrecision, qso.gridsquare.length));
+          workedGrids.add(grid);
+        }
+    });
+
+    // Draw grid squares if enabled
+    drawGridSquares();
+
+    // Only show pins if checkbox is checked
+    const showPins = document.getElementById("showPins").checked;
+
     qsos.forEach(qso => {
         if (!qso.lat || !qso.lon) return;
 
@@ -340,7 +378,11 @@
         .bindPopup(popupHtml);
 
         marker.qso = qso;
-        marker.addTo(map);
+        
+        // Only add marker to map if pins are visible
+        if (showPins) {
+          marker.addTo(map);
+        }
         markers.push(marker);
 
         if (document.getElementById("showLines").checked && qso.lat && qso.lon) {
@@ -354,9 +396,19 @@
     }
 
     function placeQTHMarkerFromLogs(qsos) {
+    const showQTH = document.getElementById("showQTH").checked;
+    
+    // Remove existing QTH marker if present
+    if (qthMarker) {
+      map.removeLayer(qthMarker);
+      qthMarker = null;
+    }
+    
+    // Only place QTH marker if checkbox is checked
+    if (!showQTH) return;
+    
     const firstValid = qsos.find(qso => qso.my_lat && qso.my_lon);
     if (firstValid) {
-        if (qthMarker) map.removeLayer(qthMarker);
         qthMarker = L.marker([firstValid.my_lat, firstValid.my_lon], {
         icon: L.divIcon({
             className: 'custom-qth-icon',
@@ -383,6 +435,158 @@
 
     function toggleLines() {
     filterQSOs();
+    }
+
+    // Grid Square Functions
+    function maidenheadToLatLon(grid) {
+      // Convert Maidenhead grid square to lat/lon bounds
+      grid = grid.toUpperCase();
+      if (grid.length < 4) return null;
+      
+      const lon = (grid.charCodeAt(0) - 65) * 20 - 180;
+      const lat = (grid.charCodeAt(1) - 65) * 10 - 90;
+      const lon2 = parseInt(grid[2]) * 2;
+      const lat2 = parseInt(grid[3]) * 1;
+      
+      let lonMin = lon + lon2;
+      let latMin = lat + lat2;
+      let lonMax = lonMin + 2;
+      let latMax = latMin + 1;
+      
+      // If 6-character grid (subsquare)
+      if (grid.length >= 6) {
+        const lon3 = (grid.charCodeAt(4) - 65) * (2/24);
+        const lat3 = (grid.charCodeAt(5) - 65) * (1/24);
+        lonMin += lon3;
+        latMin += lat3;
+        lonMax = lonMin + (2/24);
+        latMax = latMin + (1/24);
+      }
+      
+      return {
+        latMin, latMax, lonMin, lonMax,
+        center: [(latMin + latMax) / 2, (lonMin + lonMax) / 2]
+      };
+    }
+
+    function drawGridSquares() {
+      // Clear existing grid squares
+      gridSquares.forEach(g => map.removeLayer(g));
+      gridSquares = [];
+      
+      if (!document.getElementById("showGridSquares").checked) return;
+      
+      workedGrids.forEach(grid => {
+        const bounds = maidenheadToLatLon(grid);
+        if (!bounds) return;
+        
+        const rectangle = L.rectangle(
+          [[bounds.latMin, bounds.lonMin], [bounds.latMax, bounds.lonMax]],
+          {
+            color: '#FFD700',
+            weight: 2,
+            fillColor: '#FFD700',
+            fillOpacity: 0.2
+          }
+        ).addTo(map);
+        
+        // Add grid label
+        const label = L.marker(bounds.center, {
+          icon: L.divIcon({
+            className: 'grid-label',
+            html: `<div style="background: rgba(0,0,0,0.7); color: #FFD700; padding: 2px 5px; border-radius: 3px; font-weight: bold; font-size: 11px; white-space: nowrap;">${grid}</div>`,
+            iconSize: [0, 0]
+          })
+        }).addTo(map);
+        
+        gridSquares.push(rectangle);
+        gridSquares.push(label);
+      });
+    }
+
+    function toggleGridSquares() {
+      drawGridSquares();
+    }
+
+    function togglePins() {
+      filterQSOs();
+    }
+
+    function toggleQTH() {
+      // Re-plot to show/hide QTH marker
+      if (currentQSOs.length > 0) {
+        placeQTHMarkerFromLogs(currentQSOs);
+      }
+    }
+
+    function updateGridPrecision() {
+      // Redraw grid squares with new precision
+      if (currentQSOs.length > 0) {
+        filterQSOs();
+      }
+    }
+
+    // Export Map Function
+    function exportMap() {
+      const mapElement = document.getElementById('map');
+      const exportButton = event.target;
+      exportButton.disabled = true;
+      exportButton.textContent = 'Exporting...';
+      
+      // Calculate dimensions for 300 DPI
+      // Standard print size: 8.5 x 11 inches at 300 DPI = 2550 x 3300 pixels
+      const printWidth = 3300;
+      const printHeight = 2550;
+      
+      // Save current size
+      const originalWidth = mapElement.style.width;
+      const originalHeight = mapElement.style.height;
+      
+      // Temporarily resize for high-res capture
+      mapElement.style.width = printWidth + 'px';
+      mapElement.style.height = printHeight + 'px';
+      map.invalidateSize();
+      
+      setTimeout(() => {
+        html2canvas(mapElement, {
+          useCORS: true,
+          allowTaint: true,
+          scale: 1,
+          width: printWidth,
+          height: printHeight,
+          backgroundColor: '#171c3a'
+        }).then(canvas => {
+          // Convert to blob and download
+          canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().split('T')[0];
+            link.download = `rayfall-map-${timestamp}-300dpi.jpg`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            // Restore original size
+            mapElement.style.width = originalWidth;
+            mapElement.style.height = originalHeight;
+            map.invalidateSize();
+            
+            exportButton.disabled = false;
+            exportButton.textContent = 'Export Map (300 DPI)';
+          }, 'image/jpeg', 0.95);
+        }).catch(err => {
+          console.error('Export failed:', err);
+          alert('Export failed. Please try again.');
+          
+          // Restore original size
+          mapElement.style.width = originalWidth;
+          mapElement.style.height = originalHeight;
+          map.invalidateSize();
+          
+          exportButton.disabled = false;
+          exportButton.textContent = 'Export Map (300 DPI)';
+        });
+      }, 500);
     }
 
   </script>
