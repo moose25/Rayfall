@@ -16,14 +16,23 @@ Rayfall is a dynamic ham radio mapping interface that pulls your logbook data fr
 ## Features
 
 * **Interactive Leaflet Map**
-* **Supports multiple QRZ logbooks**
+* **Multiple import methods:**
+  * QRZ API integration (supports multiple logbooks)
+  * **NEW:** ADI/ADIF file import (no API key required!)
 * **Date range selection**
 * **Color-coded pins by band**
+* **Customizable display options:**
+  * Multiple pin icon styles (teardrop, circle, square, star)
+  * Selectable QTH station icons (⚡📍🏠📡🗼⭐)
+  * Custom grid square colors and opacity
+  * Multiple basemap styles
+* **Grid square overlay with 4/6-character precision**
 * **Map lines to QSOs (toggle on/off)**
-* **Custom icon for your QTH**
 * **Filter QSOs by band and mode**
+* **High-resolution map export (300 DPI for printing)**
 * **Auto-reads your QTH from log data**
-* **Client-side QRZ API Key entry (no hardcoding required)**
+* **Clean dropdown menu for display options**
+* **Works offline with ADI files**
 
 ---
 
@@ -79,13 +88,45 @@ This starts the server locally at: `http://127.0.0.1:8000`
 
 ## Usage Instructions
 
+### Getting Started
+
+**New users?** Click the **"📖 How to Use Rayfall"** button (top-right) for interactive tutorials!
+
+### Method 1: QRZ API (Online)
+
 1. Visit `http://127.0.0.1:8000` in your browser.
 2. Click the **"Change API Key"** button in the top-right.
 3. Paste in your **QRZ Logbook API key** and click **Save**.
-4. Choose a start and end date and click **Load QSOs**.
-5. Filter contacts by band/mode and enable map lines as desired.
+4. Choose a start and end date and click **Load from QRZ**.
+5. Filter contacts by band/mode and customize display options.
 
-All contacts with grid and lat/lon information will be plotted.
+### Method 2: ADI File Import (Offline) 🆕
+
+1. Visit `http://127.0.0.1:8000` in your browser.
+2. Click **"Import ADI File"** and select your `.adi` or `.adif` file.
+3. Your QSOs load instantly - no API key needed!
+4. Filter contacts by band/mode and customize display options.
+
+**See [QUICK_START_ADI.md](QUICK_START_ADI.md) for detailed ADI import guide.**
+
+### Display Customization 🆕
+
+Click the **"⚙️ Display Options"** button to access:
+- **Map Style**: Light, Dark, Topographic, Satellite, Streets
+- **QTH Icon**: Choose from 6 different station icons
+- **Pin Style**: Teardrop, Circle, Square, or Star markers
+- **Grid Squares**: Custom colors, opacity, and precision (4 or 6 chars)
+
+All contacts with grid squares or lat/lon information will be plotted.
+
+### Need Help?
+
+The **"📖 How to Use Rayfall"** button provides:
+- Step-by-step setup instructions
+- ADI import guide for all major logging software
+- Display customization tutorials
+- Filtering and export tips
+- Pro tips for advanced usage
 
 > ✅ You can switch logbooks anytime by clicking the API Key button again.
 

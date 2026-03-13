@@ -10,6 +10,24 @@
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #171c3a;
       color: rgb(226, 220, 220);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    #map {
+      flex: 1;
+    }
+
+    .footer-container {
+      background-color: #171c3a;
+      padding: 8px 0;
+      text-align: center;
+      border-top: 1px solid #2c2f5e;
+    }
+
+    .footer-container div {
+      margin: 3px 0;
     }
 
     h1, h2, h3, label, p {
@@ -19,49 +37,64 @@
     .header-container {
       display: flex;
       background-color: #171c3a;
-      padding: 10px;
+      padding: 8px 10px;
+      position: relative;
+      min-height: 90px;
+      padding-right: 220px; /* Make room for top-right buttons */
     }
 
     .logo-section {
       display: flex;
       align-items: center;
       justify-content: flex-start;
-      width: 220px;
+      width: 200px;
+      min-width: 160px;
+      flex-shrink: 0;
     }
 
     .logo-section img {
-      height: 75px;
-      margin-right: 10px;
+      height: 60px;
+      margin-right: 8px;
     }
 
     .logo-section h1 {
       margin: 0;
-      font-size: 2rem;
+      font-size: 1.75rem;
     }
 
     .controls-section {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding-left: 20px;
+      gap: 6px;
+      padding-left: 15px;
+      min-width: 0; /* Allow flexbox to shrink properly */
     }
 
     .control-row, .filter-row {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 10px;
+      padding-right: 10px;
     }
 
     .control-row input[type="date"],
     .control-row button,
-    .control-row select {
+    .control-row select,
+    .control-row input[type="file"] {
       background-color: #2c2f5e;
       color: rgb(226, 220, 220);
       border: 1px solid #444;
       padding: 5px 10px;
       border-radius: 5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .control-row input[type="file"] {
+      font-size: 13px;
+      padding: 4px 8px;
     }
 
     .control-row button,
@@ -75,16 +108,32 @@
       background-color: #3a4177;
     }
 
+    .control-row label {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
     .lines-toggle {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
+      font-size: 11px;
+    }
+    
+    .lines-toggle input[type="checkbox"] {
+      margin: 0;
+      flex-shrink: 0;
     }
 
     .compact-filters {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
+      max-width: 100%;
+    }
+
+    .compact-filters label {
+      white-space: nowrap;
     }
 
     .color-dot {
@@ -97,14 +146,310 @@
     }
 
     #map {
-      height: calc(100vh - 160px);
       width: 100%;
+      min-height: 400px;
     }
 
     .leaflet-control {
       background-color: #1e234d !important;
       color: rgb(226, 220, 220) !important;
       border: none;
+    }
+
+    /* Dropdown Menu Styles */
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-button {
+      background-color: #2c2f5e;
+      color: rgb(226, 220, 220);
+      border: 1px solid #444;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .dropdown-button:hover {
+      background-color: #3a4177;
+    }
+
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      background-color: #1e234d;
+      width: 260px;
+      box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.4);
+      z-index: 1001;
+      border-radius: 5px;
+      padding: 10px;
+      border: 1px solid #444;
+      top: 100%;
+      left: 0;
+      margin-top: 4px;
+      max-height: 60vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .dropdown-content.show {
+      display: block;
+    }
+
+    /* Ensure dropdown doesn't go off-screen on small screens */
+    @media (max-width: 768px) {
+      .dropdown-content {
+        left: auto;
+        right: 0;
+        width: 260px;
+      }
+    }
+
+    .dropdown-section {
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #444;
+    }
+
+    .dropdown-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    .dropdown-section h4 {
+      margin: 0 0 6px 0;
+      font-size: 12px;
+      color: #FFC300;
+      font-weight: 600;
+    }
+
+    .dropdown-section label {
+      display: flex;
+      align-items: center;
+      margin: 3px 0;
+      font-size: 11px;
+      line-height: 1.3;
+      gap: 8px;
+    }
+
+    .dropdown-section select {
+      flex: 1;
+      min-width: 0;
+      box-sizing: border-box;
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .dropdown-section input[type="color"] {
+      height: 32px;
+      width: 60px;
+      flex-shrink: 0;
+      border: 1px solid #444;
+      border-radius: 3px;
+    }
+    
+    .dropdown-section input[type="range"] {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+    }
+
+    .opacity-display {
+      display: inline-block;
+      margin-left: 5px;
+      font-weight: bold;
+      color: #FFC300;
+      font-size: 11px;
+    }
+
+    .icon-preview {
+      display: inline-block;
+      font-size: 20px;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+
+    /* Help Modal Styles */
+    .help-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1e234d;
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      z-index: 2000;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow-y: auto;
+      color: rgb(226, 220, 220);
+    }
+
+    .help-modal h2 {
+      margin-top: 0;
+      color: #FFC300;
+      border-bottom: 2px solid #444;
+      padding-bottom: 10px;
+    }
+
+    .help-modal h3 {
+      color: #FFD700;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+    }
+
+    .help-modal p, .help-modal ol, .help-modal ul {
+      line-height: 1.6;
+      margin: 10px 0;
+    }
+
+    .help-modal ol {
+      padding-left: 25px;
+    }
+
+    .help-modal li {
+      margin: 8px 0;
+    }
+
+    .help-modal code {
+      background: #2c2f5e;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      color: #FFD700;
+    }
+
+    .help-section {
+      margin-bottom: 25px;
+      padding: 15px;
+      background: rgba(44, 47, 94, 0.3);
+      border-radius: 5px;
+      border-left: 3px solid #FFC300;
+    }
+
+    .help-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    .help-buttons button {
+      background-color: #2c2f5e;
+      color: rgb(226, 220, 220);
+      border: 1px solid #444;
+      padding: 8px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .help-buttons button:hover {
+      background-color: #3a4177;
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1500;
+    }
+
+    .top-right-buttons {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+      max-width: 200px;
+    }
+
+    .top-right-buttons button {
+      background-color: #2c2f5e;
+      color: rgb(226, 220, 220);
+      border: 1px solid #444;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .top-right-buttons button:hover {
+      background-color: #3a4177;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 1400px) {
+      .header-container {
+        padding-right: 210px;
+      }
+    }
+
+    @media (max-width: 1200px) {
+      .header-container {
+        flex-direction: column;
+        padding-right: 10px;
+        padding-bottom: 60px; /* Make room for repositioned buttons */
+      }
+      
+      .logo-section {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 10px;
+      }
+      
+      .controls-section {
+        padding-left: 0;
+      }
+      
+      .top-right-buttons {
+        top: auto;
+        bottom: 10px;
+        right: 10px;
+        flex-direction: row;
+        max-width: none;
+      }
+      
+      .top-right-buttons button {
+        font-size: 12px;
+        padding: 5px 10px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .control-row {
+        gap: 8px;
+      }
+      
+      .control-row button,
+      .control-row select,
+      .control-row input {
+        font-size: 12px;
+        padding: 4px 8px;
+      }
+      
+      .logo-section h1 {
+        font-size: 1.5rem;
+      }
+      
+      .logo-section img {
+        height: 60px;
+      }
     }
   </style>
 </head>
@@ -120,37 +465,99 @@
         <input type="date" id="start" />
         <label for="end">End:</label>
         <input type="date" id="end" />
-        <button onclick="loadQSOs()">Load QSOs</button>
-        <label class="lines-toggle">
-          <input type="checkbox" id="showLines" onchange="toggleLines()" /> Show Lines
-        </label>
+        <button onclick="loadQSOs()">Load from QRZ</button>
         <label>
-          <input type="checkbox" id="colorByBand" checked onchange="filterQSOs()" /> Color by Band
+          <input type="file" id="adiFile" accept=".adi,.adif" onchange="loadADIFile()" /> Import ADI File
         </label>
-        <label>
-          <select id="basemapSelector" onchange="switchBaseMap(this.value)">
-            <option value="light">Light</option>
-            <option value="dark" selected>Dark</option>
-            <option value="topo">Topographic</option>
-            <option value="satellite">Satellite</option>
-            <option value="streets">Streets</option>
-          </select>
-        </label>
-        <label class="lines-toggle">
-          <input type="checkbox" id="showGridSquares" onchange="toggleGridSquares()" /> Show Grid Squares
-        </label>
-        <label>
-          <select id="gridPrecision" onchange="updateGridPrecision()">
-            <option value="4">4-char grids</option>
-            <option value="6" selected>6-char grids</option>
-          </select>
-        </label>
-        <label class="lines-toggle">
-          <input type="checkbox" id="showPins" checked onchange="togglePins()" /> Show Pins
-        </label>
-        <label class="lines-toggle">
-          <input type="checkbox" id="showQTH" checked onchange="toggleQTH()" /> Show QTH
-        </label>
+        <div class="dropdown">
+          <button class="dropdown-button" onclick="toggleDisplayOptions()">
+            ⚙️ Display Options
+          </button>
+          <div id="displayDropdown" class="dropdown-content">
+            <div class="dropdown-section">
+              <h4>Map Style</h4>
+              <label>
+                <select id="basemapSelector" onchange="switchBaseMap(this.value)">
+                  <option value="light">Light</option>
+                  <option value="dark" selected>Dark</option>
+                  <option value="topo">Topographic</option>
+                  <option value="satellite">Satellite</option>
+                  <option value="streets">Streets</option>
+                </select>
+              </label>
+            </div>
+            <div class="dropdown-section">
+              <h4>Display Features</h4>
+              <label class="lines-toggle">
+                <input type="checkbox" id="showLines" onchange="toggleLines()" /> Show Lines to QSOs
+              </label>
+              <label class="lines-toggle">
+                <input type="checkbox" id="colorByBand" checked onchange="filterQSOs()" /> Color Pins by Band
+              </label>
+            </div>
+            <div class="dropdown-section">
+              <h4>QTH Station Icon</h4>
+              <label>
+                <select id="qthIconSelector" onchange="updateQTHIcon()">
+                  <option value="⚡">⚡ Lightning Bolt</option>
+                  <option value="📍">📍 Pin</option>
+                  <option value="🏠">🏠 House</option>
+                  <option value="📡">📡 Satellite Dish</option>
+                  <option value="🗼">🗼 Tower</option>
+                  <option value="⭐">⭐ Star</option>
+                </select>
+                <span class="icon-preview" id="qthIconPreview">⚡</span>
+              </label>
+              <label class="lines-toggle">
+                <input type="checkbox" id="showQTH" checked onchange="toggleQTH()" /> Show QTH Station
+              </label>
+            </div>
+            <div class="dropdown-section">
+              <h4>Pin Icons</h4>
+              <label>
+                Style:
+                <select id="pinStyleSelector" onchange="updatePinStyle()">
+                  <option value="teardrop" selected>Teardrop</option>
+                  <option value="circle">Circle</option>
+                  <option value="square">Square</option>
+                  <option value="star">Star</option>
+                </select>
+              </label>
+              <label>
+                Color: <input type="color" id="pinColor" value="#3399FF" onchange="updatePinColor()" />
+              </label>
+              <label class="lines-toggle">
+                <input type="checkbox" id="showPins" checked onchange="togglePins()" /> Show Pins
+              </label>
+            </div>
+            <div class="dropdown-section">
+              <h4>Grid Squares</h4>
+              <label class="lines-toggle">
+                <input type="checkbox" id="showGridSquares" onchange="toggleGridSquares()" /> Show Grids
+              </label>
+              <label>
+                Precision:
+                <select id="gridPrecision" onchange="updateGridPrecision()">
+                  <option value="4">4-char</option>
+                  <option value="6" selected>6-char</option>
+                </select>
+              </label>
+              <label>
+                Color: <input type="color" id="gridColor" value="#FFD700" onchange="updateGridStyle()" />
+              </label>
+              <label>
+                Opacity: <input type="range" id="gridOpacity" min="0" max="100" value="20" onchange="updateGridStyle()" />
+                <span class="opacity-display" id="gridOpacityDisplay">20%</span>
+              </label>
+              <label class="lines-toggle">
+                <input type="checkbox" id="showGridLabels" checked onchange="updateGridStyle()" /> Show Labels
+              </label>
+              <label class="lines-toggle">
+                <input type="checkbox" id="gridLabelBackground" checked onchange="updateGridStyle()" /> Label Background
+              </label>
+            </div>
+          </div>
+        </div>
         <button onclick="exportMap()">Export Map (300 DPI)</button>
       </div>
       <div class="filter-row">
@@ -169,22 +576,117 @@
     <input type="text" id="apiKeyInput" style="width:100%; margin:10px 0;"><br>
     <button onclick="saveApiKey()">Save</button>
     <button onclick="closeApiModal()">Cancel</button>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="modalOverlay" class="modal-overlay" onclick="closeHelpModal()"></div>
+  <div id="helpModal" class="help-modal">
+    <h2>📖 How to Use Rayfall</h2>
+    
+    <div class="help-section">
+      <h3>🔑 Method 1: Using QRZ API</h3>
+      <ol>
+        <li>Click the <strong>"Change API Key"</strong> button (top-right)</li>
+        <li>Enter your QRZ Logbook API key</li>
+        <li>Select a <strong>Start Date</strong> and <strong>End Date</strong></li>
+        <li>Click <strong>"Load from QRZ"</strong></li>
+        <li>Your contacts will appear on the map! 🗺️</li>
+      </ol>
+      <p><strong>Getting your API Key:</strong> Visit <code>logbook.qrz.com</code> → Settings → API</p>
     </div>
-    <div style="position:absolute; top:10px; right:10px;">
-    <button onclick="openApiModal()">Change API Key</button>
+
+    <div class="help-section">
+      <h3>📁 Method 2: Import ADI/ADIF Files</h3>
+      <ol>
+        <li>Export your log as an ADI file from your logging software:
+          <ul>
+            <li><strong>QRZ Logbook:</strong> Logbook → ADIF → Download</li>
+            <li><strong>Log4OM:</strong> File → Export → ADIF</li>
+            <li><strong>WSJT-X:</strong> File → Export ADIF</li>
+            <li><strong>N1MM Logger+:</strong> File → Export → ADIF</li>
+          </ul>
+        </li>
+        <li>Click <strong>"Import ADI File"</strong> button</li>
+        <li>Select your <code>.adi</code> or <code>.adif</code> file</li>
+        <li>Your contacts load instantly - no API key needed! ⚡</li>
+      </ol>
+      <p><strong>Benefit:</strong> Works offline, completely private, no internet required!</p>
+    </div>
+
+    <div class="help-section">
+      <h3>🎨 Customizing Your Map</h3>
+      <p>Click the <strong>"⚙️ Display Options"</strong> button to access:</p>
+      <ul>
+        <li><strong>Map Style:</strong> Choose Light, Dark, Topographic, Satellite, or Streets</li>
+        <li><strong>QTH Station Icon:</strong> Select from ⚡ 📍 🏠 📡 🗼 ⭐</li>
+        <li><strong>Pin Icons:</strong> Change marker style (Teardrop, Circle, Square, Star)</li>
+        <li><strong>Grid Squares:</strong> 
+          <ul>
+            <li>Toggle grid square overlay on/off</li>
+            <li>Choose 4-character or 6-character precision</li>
+            <li>Pick custom colors with the color picker</li>
+            <li>Adjust opacity (0-100%)</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>🔍 Filtering Contacts</h3>
+      <ul>
+        <li><strong>Show Lines:</strong> Toggle lines from your QTH to contacts</li>
+        <li><strong>Color by Band:</strong> Color-code pins by frequency band</li>
+        <li><strong>Band Filters:</strong> Check/uncheck specific bands (20m, 40m, etc.)</li>
+        <li><strong>Mode Filters:</strong> Filter by mode (SSB, CW, FT8, etc.)</li>
+      </ul>
+      <p>The <strong>QSO counter</strong> updates live as you filter!</p>
+    </div>
+
+    <div class="help-section">
+      <h3>🖨️ Exporting for Printing</h3>
+      <ol>
+        <li>Arrange your map exactly how you want it</li>
+        <li>Use Display Options to customize appearance</li>
+        <li>Click <strong>"Export Map (300 DPI)"</strong></li>
+        <li>A high-resolution JPEG will download (3300×2550 pixels)</li>
+        <li>Perfect for printing at 11"×8.5"!</li>
+      </ol>
+      <p><strong>Tip:</strong> Hide pins and show only grid squares for clean award maps!</p>
+    </div>
+
+    <div class="help-section">
+      <h3>💡 Pro Tips</h3>
+      <ul>
+        <li>🎯 <strong>Contest Analysis:</strong> Import contest logs and visualize propagation patterns</li>
+        <li>📊 <strong>Award Progress:</strong> Use 6-char grids to see exactly what you've worked</li>
+        <li>🌈 <strong>Custom Themes:</strong> Match grid colors to your award theme</li>
+        <li>💾 <strong>Multiple Logs:</strong> Import different ADI files for comparison</li>
+        <li>🔒 <strong>Privacy:</strong> ADI import means your logs never leave your computer</li>
+      </ul>
+    </div>
+
+    <div class="help-buttons">
+      <button onclick="closeHelpModal()">Close</button>
+    </div>
+  </div>
+
+  <div class="top-right-buttons">
+    <button onclick="openHelpModal()">📖 How to Use Rayfall</button>
+    <button onclick="openApiModal()">🔑 Change API Key</button>
   </div>
 
 
   <div id="map"></div>
 
-  <div style="text-align:center; color:grey; margin-top:8px; font-size:14px;">
-  Created by N2CLW
-  </div>
-
-  <div style="text-align: center; color: grey; font-size: 14px; margin-top: 6px;">
-  <a href="https://github.com/moose25/rayfall" target="_blank" style="color: grey; text-decoration: none;">
-    View on GitHub
-  </a>
+  <div class="footer-container">
+    <div style="color:grey; font-size:13px;">
+      Created by N2CLW
+    </div>
+    <div style="color: grey; font-size: 13px;">
+      <a href="https://github.com/moose25/rayfall" target="_blank" style="color: grey; text-decoration: none;">
+        View on GitHub
+      </a>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -239,6 +741,15 @@
     }
 
     let qthMarker = null;
+    let currentPinStyle = 'teardrop';
+    let currentQTHIcon = '⚡';
+    let customPinColor = '#3399FF';
+    let gridStyleConfig = {
+      color: '#FFD700',
+      opacity: 0.20,
+      showLabels: true,
+      labelBackground: true
+    };
 
     function loadQSOs() {
     const start = document.getElementById("start").value;
@@ -255,15 +766,152 @@
         return;
     }
 
+    // Clear the file input
+    const fileInput = document.getElementById('adiFile');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+
     fetch(`/api/logs?start=${start}&end=${end}`, {
         headers: { "x-api-key": apiKey }
     })
-        .then(res => res.json())
+        .then(res => {
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+        })
         .then(data => {
+        console.log('QRZ API response:', data);
+        
+        // Clear existing data completely
+        currentQSOs = [];
+        workedGrids.clear();
         clearMap();
+        
+        // Check if data has qsos array
+        if (!data.qsos || !Array.isArray(data.qsos)) {
+            throw new Error('Invalid response format from server');
+        }
+        
+        if (data.qsos.length === 0) {
+            alert('No QSOs found for the selected date range.');
+            return;
+        }
+        
+        // Load new data
         populateFilters(data.qsos);
         plotQSOs(data.qsos);
+        })
+        .catch(err => {
+        console.error('Error loading from QRZ:', err);
+        alert(`Failed to load data from QRZ: ${err.message}\nPlease check your API key and date range.`);
         });
+    }
+
+    // ADI File Import
+    function loadADIFile() {
+      const fileInput = document.getElementById('adiFile');
+      const file = fileInput.files[0];
+      
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const adiText = e.target.result;
+        const qsos = parseADI(adiText);
+        
+        if (qsos.length === 0) {
+          alert('No valid QSOs found in ADI file.');
+          return;
+        }
+        
+        // Clear existing data completely
+        currentQSOs = [];
+        workedGrids.clear();
+        clearMap();
+        
+        // Load new data
+        populateFilters(qsos);
+        plotQSOs(qsos);
+        alert(`Loaded ${qsos.length} QSOs from ADI file!`);
+      };
+      
+      reader.onerror = function() {
+        alert('Error reading file. Please try again.');
+      };
+      
+      reader.readAsText(file);
+    }
+
+    function parseADI(adiText) {
+      // Parse ADI/ADIF format
+      const entries = adiText.split(/<eor>/i);
+      const qsos = [];
+      
+      entries.forEach(entry => {
+        const qso = {};
+        const fieldRegex = /<(\w+):(\d+)(?::(\w+))?>([^<]*)/gi;
+        let match;
+        
+        while ((match = fieldRegex.exec(entry)) !== null) {
+          const fieldName = match[1].toLowerCase();
+          const fieldLength = parseInt(match[2]);
+          const fieldValue = match[4].substring(0, fieldLength);
+          qso[fieldName] = fieldValue;
+        }
+        
+        if (qso.call) {
+          // Convert DMS coordinates to decimal if present
+          const parsedQSO = {
+            call: qso.call,
+            band: qso.band,
+            mode: qso.mode,
+            qso_date: qso.qso_date,
+            time_on: qso.time_on,
+            gridsquare: qso.gridsquare,
+            country: qso.country,
+            state: qso.state,
+            distance: qso.distance,
+            lat: qso.lat ? dmsToDecimal(qso.lat) : null,
+            lon: qso.lon ? dmsToDecimal(qso.lon) : null,
+            my_lat: qso.my_lat ? dmsToDecimal(qso.my_lat) : null,
+            my_lon: qso.my_lon ? dmsToDecimal(qso.my_lon) : null
+          };
+          
+          qsos.push(parsedQSO);
+        }
+      });
+      
+      return qsos;
+    }
+
+    function dmsToDecimal(coord) {
+      // Convert DMS format like "N039 02.244" to decimal
+      if (!coord) return null;
+      
+      const direction = coord.charAt(0);
+      const coordStr = coord.substring(1).trim();
+      
+      // Try to parse as decimal first
+      if (!coordStr.includes(' ')) {
+        const decimal = parseFloat(coordStr);
+        return direction === 'S' || direction === 'W' ? -decimal : decimal;
+      }
+      
+      // Parse DMS format
+      const parts = coordStr.split(' ');
+      if (parts.length !== 2) return null;
+      
+      const degrees = parseFloat(parts[0]);
+      const minutes = parseFloat(parts[1]);
+      let decimal = degrees + (minutes / 60);
+      
+      if (direction === 'S' || direction === 'W') {
+        decimal *= -1;
+      }
+      
+      return decimal;
     }
 
     function clearMap() {
@@ -323,6 +971,17 @@
     closeApiModal();
     }
 
+    // Help Modal Functions
+    function openHelpModal() {
+      document.getElementById("modalOverlay").style.display = "block";
+      document.getElementById("helpModal").style.display = "block";
+    }
+
+    function closeHelpModal() {
+      document.getElementById("modalOverlay").style.display = "none";
+      document.getElementById("helpModal").style.display = "none";
+    }
+
     function plotQSOs(qsos) {
     document.getElementById("qsoCount").textContent = qsos.length;
     placeQTHMarkerFromLogs(qsos);
@@ -349,17 +1008,9 @@
 
         const useBandColor = document.getElementById("colorByBand").checked;
         const band = (qso.band || "").toLowerCase();
-        const markerColor = useBandColor ? (bandColors[band] || "#3399FF") : "#3399FF";
+        const markerColor = useBandColor ? (bandColors[band] || customPinColor) : customPinColor;
 
-        const svgIcon = L.divIcon({
-        className: "",
-        html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
-            <path d="M12 0C5.4 0 0 5.4 0 12c0 7.5 12 24 12 24s12-16.5 12-24C24 5.4 18.6 0 12 0z" fill="${markerColor}" stroke="#000" stroke-width="1"/>
-            <circle cx="12" cy="12" r="5" fill="#fff"/></svg>`,
-        iconSize: [24, 36],
-        iconAnchor: [12, 36],
-        popupAnchor: [0, -36]
-        });
+        const markerIcon = createPinIcon(markerColor, currentPinStyle);
 
         const popupHtml = `
         <div style="line-height: 1.5;">
@@ -374,7 +1025,7 @@
             ${qso.distance ? `<b>Distance:</b> ${qso.distance} mi` : ''}
         </div>`;
 
-        const marker = L.marker([qso.lat, qso.lon], { icon: svgIcon })
+        const marker = L.marker([qso.lat, qso.lon], { icon: markerIcon })
         .bindPopup(popupHtml);
 
         marker.qso = qso;
@@ -395,6 +1046,57 @@
     });
     }
 
+    // Create pin icons based on style
+    function createPinIcon(color, style) {
+      switch(style) {
+        case 'circle':
+          return L.divIcon({
+            className: "",
+            html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" fill="${color}" stroke="#000" stroke-width="2"/>
+              <circle cx="12" cy="12" r="4" fill="#fff"/></svg>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+            popupAnchor: [0, -12]
+          });
+        
+        case 'square':
+          return L.divIcon({
+            className: "",
+            html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+              <rect x="2" y="2" width="20" height="20" fill="${color}" stroke="#000" stroke-width="2"/>
+              <rect x="8" y="8" width="8" height="8" fill="#fff"/></svg>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+            popupAnchor: [0, -12]
+          });
+        
+        case 'star':
+          return L.divIcon({
+            className: "",
+            html: `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+              <path d="M14 2l3.09 6.26L24 9.27l-5 4.87 1.18 6.88L14 17.77l-6.18 3.25L9 14.14 4 9.27l6.91-1.01L14 2z" 
+                fill="${color}" stroke="#000" stroke-width="1.5"/></svg>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+            popupAnchor: [0, -14]
+          });
+        
+        case 'teardrop':
+        default:
+          return L.divIcon({
+            className: "",
+            html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
+              <path d="M12 0C5.4 0 0 5.4 0 12c0 7.5 12 24 12 24s12-16.5 12-24C24 5.4 18.6 0 12 0z" 
+                fill="${color}" stroke="#000" stroke-width="1"/>
+              <circle cx="12" cy="12" r="5" fill="#fff"/></svg>`,
+            iconSize: [24, 36],
+            iconAnchor: [12, 36],
+            popupAnchor: [0, -36]
+          });
+      }
+    }
+
     function placeQTHMarkerFromLogs(qsos) {
     const showQTH = document.getElementById("showQTH").checked;
     
@@ -412,7 +1114,7 @@
         qthMarker = L.marker([firstValid.my_lat, firstValid.my_lon], {
         icon: L.divIcon({
             className: 'custom-qth-icon',
-            html: '<div style="font-size: 32px; text-shadow: 1px 1px 4px black;">⚡</div>',
+            html: `<div style="font-size: 32px; text-shadow: 1px 1px 4px black;">${currentQTHIcon}</div>`,
             iconSize: [24, 24],
             iconAnchor: [16, 16]
         }),
@@ -483,24 +1185,31 @@
         const rectangle = L.rectangle(
           [[bounds.latMin, bounds.lonMin], [bounds.latMax, bounds.lonMax]],
           {
-            color: '#FFD700',
+            color: gridStyleConfig.color,
             weight: 2,
-            fillColor: '#FFD700',
-            fillOpacity: 0.2
+            fillColor: gridStyleConfig.color,
+            fillOpacity: gridStyleConfig.opacity
           }
         ).addTo(map);
         
-        // Add grid label
-        const label = L.marker(bounds.center, {
-          icon: L.divIcon({
-            className: 'grid-label',
-            html: `<div style="background: rgba(0,0,0,0.7); color: #FFD700; padding: 2px 5px; border-radius: 3px; font-weight: bold; font-size: 11px; white-space: nowrap;">${grid}</div>`,
-            iconSize: [0, 0]
-          })
-        }).addTo(map);
-        
         gridSquares.push(rectangle);
-        gridSquares.push(label);
+        
+        // Add grid label if enabled
+        if (gridStyleConfig.showLabels) {
+          const bgStyle = gridStyleConfig.labelBackground 
+            ? `background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 3px;` 
+            : `padding: 0; text-shadow: 1px 1px 3px black, -1px -1px 3px black, 1px -1px 3px black, -1px 1px 3px black;`;
+          
+          const label = L.marker(bounds.center, {
+            icon: L.divIcon({
+              className: 'grid-label',
+              html: `<div style="${bgStyle} color: ${gridStyleConfig.color}; font-weight: bold; font-size: 11px; white-space: nowrap; display: inline-block;">${grid}</div>`,
+              iconSize: [0, 0]
+            })
+          }).addTo(map);
+          
+          gridSquares.push(label);
+        }
       });
     }
 
@@ -524,6 +1233,69 @@
       if (currentQSOs.length > 0) {
         filterQSOs();
       }
+    }
+
+    // Display Options Dropdown
+    function toggleDisplayOptions() {
+      const dropdown = document.getElementById('displayDropdown');
+      dropdown.classList.toggle('show');
+    }
+
+    // Close dropdown when clicking outside
+    window.onclick = function(event) {
+      if (!event.target.matches('.dropdown-button') && !event.target.closest('.dropdown-content')) {
+        const dropdown = document.getElementById('displayDropdown');
+        if (dropdown && dropdown.classList.contains('show')) {
+          dropdown.classList.remove('show');
+        }
+      }
+    }
+
+    function updateQTHIcon() {
+      const selector = document.getElementById('qthIconSelector');
+      currentQTHIcon = selector.value;
+      document.getElementById('qthIconPreview').textContent = currentQTHIcon;
+      
+      // Redraw QTH marker with new icon
+      if (currentQSOs.length > 0) {
+        placeQTHMarkerFromLogs(currentQSOs);
+      }
+    }
+
+    function updatePinStyle() {
+      currentPinStyle = document.getElementById('pinStyleSelector').value;
+      
+      // Redraw all markers with new style
+      if (currentQSOs.length > 0) {
+        filterQSOs();
+      }
+    }
+
+    function updatePinColor() {
+      customPinColor = document.getElementById('pinColor').value;
+      
+      // Redraw all markers with new color if not using band colors
+      if (currentQSOs.length > 0) {
+        filterQSOs();
+      }
+    }
+
+    function updateGridStyle() {
+      const colorInput = document.getElementById('gridColor');
+      const opacityInput = document.getElementById('gridOpacity');
+      const opacityDisplay = document.getElementById('gridOpacityDisplay');
+      const showLabels = document.getElementById('showGridLabels');
+      const labelBackground = document.getElementById('gridLabelBackground');
+      
+      gridStyleConfig.color = colorInput.value;
+      gridStyleConfig.opacity = opacityInput.value / 100;
+      gridStyleConfig.showLabels = showLabels.checked;
+      gridStyleConfig.labelBackground = labelBackground.checked;
+      
+      opacityDisplay.textContent = opacityInput.value + '%';
+      
+      // Redraw grid squares with new style
+      drawGridSquares();
     }
 
     // Export Map Function
