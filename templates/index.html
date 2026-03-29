@@ -1004,7 +1004,19 @@
     const showPins = document.getElementById("showPins").checked;
 
     qsos.forEach(qso => {
-        if (!qso.lat || !qso.lon) return;
+        let markerLat = qso.lat;
+        let markerLon = qso.lon;
+
+        // Fallback: derive a marker position from the gridsquare center when lat/lon is missing.
+        if ((!markerLat || !markerLon) && qso.gridsquare) {
+          const gridBounds = maidenheadToLatLon(qso.gridsquare);
+          if (gridBounds) {
+            markerLat = gridBounds.center[0];
+            markerLon = gridBounds.center[1];
+          }
+        }
+
+        if (!markerLat || !markerLon) return;
 
         const useBandColor = document.getElementById("colorByBand").checked;
         const band = (qso.band || "").toLowerCase();
@@ -1025,7 +1037,7 @@
             ${qso.distance ? `<b>Distance:</b> ${qso.distance} mi` : ''}
         </div>`;
 
-        const marker = L.marker([qso.lat, qso.lon], { icon: markerIcon })
+        const marker = L.marker([markerLat, markerLon], { icon: markerIcon })
         .bindPopup(popupHtml);
 
         marker.qso = qso;
@@ -1036,9 +1048,9 @@
         }
         markers.push(marker);
 
-        if (document.getElementById("showLines").checked && qso.lat && qso.lon) {
+        if (document.getElementById("showLines").checked && qso.my_lat && qso.my_lon) {
         const outline = L.polyline(
-            [[qso.my_lat, qso.my_lon], [qso.lat, qso.lon]],
+          [[qso.my_lat, qso.my_lon], [markerLat, markerLon]],
             { color: "grey", weight: 2, opacity: 1 }
         ).addTo(map);
         lines.push(outline);
