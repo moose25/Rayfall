@@ -1,0 +1,2 @@
+# Normalize all text files to LF on commit; auto-detect binary.
+* text=auto eol=lf
