@@ -2,7 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Rayfall Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% if og %}{{ og.title }}{% else %}Rayfall Map{% endif %}</title>
+  {% if og %}
+  <meta name="description" content="{{ og.description }}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Rayfall" />
+  <meta property="og:title" content="{{ og.title }}" />
+  <meta property="og:description" content="{{ og.description }}" />
+  <meta property="og:image" content="{{ og.image }}" />
+  <meta property="og:url" content="{{ og.url }}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ og.title }}" />
+  <meta name="twitter:description" content="{{ og.description }}" />
+  <meta name="twitter:image" content="{{ og.image }}" />
+  {% endif %}
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body {
@@ -765,17 +779,19 @@
 
   <div id="shareModal" class="share-modal">
     <h2>🔗 Share this map</h2>
-    <p style="font-size:13px; color:#bbb; margin:0;">A read-only snapshot of your current map. Anyone with the link can view it.</p>
+    <p style="font-size:13px; color:#bbb; margin:0 0 10px;">A read-only snapshot of your current map. Anyone with the link can view it, and the link unfurls with a preview image when posted to social sites.</p>
+    <img id="sharePreview" alt="Map preview" style="display:none; width:100%; border-radius:6px; border:1px solid #444; margin-bottom:8px;" />
     <label for="shareLink">Shareable link</label>
     <div class="share-field">
       <input type="text" id="shareLink" readonly />
       <button onclick="copyShareField('shareLink', this)">Copy</button>
     </div>
-    <label for="embedCode">Embed code (paste into a web page or your QRZ.com bio)</label>
+    <label for="embedCode">Embed code (forums, Discord, websites)</label>
     <div class="share-field">
       <textarea id="embedCode" rows="3" readonly></textarea>
       <button onclick="copyShareField('embedCode', this)">Copy</button>
     </div>
+    <p style="margin:12px 0 0; font-size:13px;"><a id="shareImageLink" href="#" target="_blank" style="color:#FFC300; text-decoration:none;">&#11015; Download map image</a> <span style="color:#888;">&mdash; for QRZ.com (which blocks iframes): upload this to your QRZ images, then link it to the map.</span></p>
     <div class="close-row"><button class="close-btn" onclick="closeShareModal()">Close</button></div>
   </div>
 
@@ -1520,6 +1536,12 @@
       document.getElementById('shareLink').value = d.url;
       document.getElementById('embedCode').value =
         `<iframe src="${d.embed_url}" width="100%" height="500" style="border:0;border-radius:8px;" title="Rayfall QSO map" loading="lazy"></iframe>`;
+      if (d.preview_url) {
+        const img = document.getElementById('sharePreview');
+        img.src = d.preview_url;
+        img.style.display = 'block';
+        document.getElementById('shareImageLink').href = d.preview_url;
+      }
       try {
         const saved = JSON.parse(localStorage.getItem('rayfallShares') || '{}');
         saved[d.id] = d.delete_token;

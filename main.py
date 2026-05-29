@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Query, HTTPException, Request, Header
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Query, HTTPException, Request, Header, BackgroundTasks
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -9,6 +9,7 @@ import gzip
 import json
 import os
 import secrets
+import threading
 from datetime import datetime, timezone
 
 app = FastAPI()
@@ -19,6 +20,14 @@ DB_PATH = os.environ.get("RAYFALL_DB", os.path.join(BASE_DIR, "data", "rayfall.d
 # Limits for shared snapshots
 MAX_QSOS = 50000
 MAX_COMPRESSED_BYTES = 8 * 1024 * 1024
+
+# Preview-image rendering (runs Chromium in a separate venv, out of process)
+PREVIEW_DIR = os.path.join(BASE_DIR, "data", "previews")
+RENDER_PYTHON = os.path.join(BASE_DIR, ".render-venv", "bin", "python")
+RENDER_SCRIPT = os.path.join(BASE_DIR, "render_preview.py")
+RENDER_LOCAL_BASE = os.environ.get("RAYFALL_LOCAL_BASE", "http://127.0.0.1:8000")
+FALLBACK_IMAGE = os.path.join(BASE_DIR, "static", "rayfall.png")
+_render_lock = threading.Lock()
 
 # Mount static folder
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -77,12 +86,55 @@ def base_url(request: Request) -> str:
     return f"{proto}://{host}"
 
 
+def _load_share(share_id: str):
+    con = get_db()
+    try:
+        row = con.execute("SELECT payload FROM shares WHERE id = ?", (share_id,)).fetchone()
+    finally:
+        con.close()
+    if row is None:
+        return None
+    return json.loads(gzip.decompress(row["payload"]).decode("utf-8"))
+
+
+def preview_path(share_id: str) -> str:
+    return os.path.join(PREVIEW_DIR, f"{share_id}.png")
+
+
+def ensure_preview(share_id: str) -> bool:
+    """Return True if a preview PNG exists (rendering it if needed). Cached on disk."""
+    out = preview_path(share_id)
+    if os.path.exists(out) and os.path.getsize(out) > 0:
+        return True
+    if not os.path.exists(RENDER_PYTHON):
+        return False
+    os.makedirs(PREVIEW_DIR, exist_ok=True)
+    with _render_lock:
+        if os.path.exists(out) and os.path.getsize(out) > 0:
+            return True
+        try:
+            subprocess.run(
+                [RENDER_PYTHON, RENDER_SCRIPT, share_id, out, RENDER_LOCAL_BASE],
+                timeout=90, check=True, capture_output=True,
+            )
+        except Exception:
+            return False
+    return os.path.exists(out) and os.path.getsize(out) > 0
+
+
 init_db()
 
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_home(request: Request):
-    return templates.TemplateResponse(request, "index.html", {"mode": "edit", "share_id": ""})
+    root = base_url(request)
+    og = {
+        "title": "Rayfall — Ham Radio QSO Map Viewer",
+        "description": "Plot your amateur radio contacts on an interactive map. Load from QRZ or an ADIF file, then share or embed your map.",
+        "image": f"{root}/static/rayfall.png",
+        "url": f"{root}/",
+    }
+    return templates.TemplateResponse(request, "index.html", {"mode": "edit", "share_id": "", "og": og})
 
 
 class SharePayload(BaseModel):
@@ -94,7 +146,7 @@ class SharePayload(BaseModel):
 
 
 @app.post("/api/share")
-def create_share(payload: SharePayload, request: Request):
+def create_share(payload: SharePayload, request: Request, background_tasks: BackgroundTasks):
     if not payload.qsos:
         raise HTTPException(status_code=400, detail="No QSOs to share")
     if len(payload.qsos) > MAX_QSOS:
@@ -129,11 +181,15 @@ def create_share(payload: SharePayload, request: Request):
     finally:
         con.close()
 
+    # Pre-warm the preview image so links unfurl immediately when shared
+    background_tasks.add_task(ensure_preview, share_id)
+
     root = base_url(request)
     return {
         "id": share_id,
         "url": f"{root}/m/{share_id}",
         "embed_url": f"{root}/embed/{share_id}",
+        "preview_url": f"{root}/preview/{share_id}.png",
         "delete_token": delete_token,
     }
 
@@ -182,9 +238,18 @@ def _share_exists(share_id: str) -> bool:
 
 @app.get("/m/{share_id}", response_class=HTMLResponse)
 async def view_share(request: Request, share_id: str):
-    if not _share_exists(share_id):
+    data = _load_share(share_id)
+    if data is None:
         raise HTTPException(status_code=404, detail="Share not found")
-    return templates.TemplateResponse(request, "index.html", {"mode": "view", "share_id": share_id})
+    count = len(data.get("qsos", []))
+    root = base_url(request)
+    og = {
+        "title": f"{count:,} QSOs mapped on Rayfall" if count else "A QSO map on Rayfall",
+        "description": "An interactive amateur radio contact map. Explore the contacts, or build and share your own at rayfall.me.",
+        "image": f"{root}/preview/{share_id}.png",
+        "url": f"{root}/m/{share_id}",
+    }
+    return templates.TemplateResponse(request, "index.html", {"mode": "view", "share_id": share_id, "og": og})
 
 
 @app.get("/embed/{share_id}", response_class=HTMLResponse)
@@ -194,6 +259,14 @@ async def embed_share(request: Request, share_id: str):
     resp = templates.TemplateResponse(request, "index.html", {"mode": "embed", "share_id": share_id})
     resp.headers["Content-Security-Policy"] = "frame-ancestors *"
     return resp
+
+
+@app.get("/preview/{share_id}.png")
+def preview_image(share_id: str):
+    headers = {"Cache-Control": "public, max-age=86400"}
+    if _share_exists(share_id) and ensure_preview(share_id):
+        return FileResponse(preview_path(share_id), media_type="image/png", headers=headers)
+    return FileResponse(FALLBACK_IMAGE, media_type="image/png", headers=headers)
 
 
 def dms_to_decimal(coord_str):
