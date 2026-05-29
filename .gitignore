@@ -9,3 +9,5 @@ __pycache__/
 commands.txt
 github-recovery-codes.txt
 data/
+static/previews/
+.render-venv/
