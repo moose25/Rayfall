@@ -2,9 +2,23 @@ from fastapi import FastAPI, Query, HTTPException, Request, Header
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 import subprocess
+import sqlite3
+import gzip
+import json
+import os
+import secrets
+from datetime import datetime, timezone
 
 app = FastAPI()
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("RAYFALL_DB", os.path.join(BASE_DIR, "data", "rayfall.db"))
+
+# Limits for shared snapshots
+MAX_QSOS = 50000
+MAX_COMPRESSED_BYTES = 8 * 1024 * 1024
 
 # Mount static folder
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -12,9 +26,175 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Use Jinja2 templates from templates/
 templates = Jinja2Templates(directory="templates")
 
+
+def init_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    con = sqlite3.connect(DB_PATH)
+    try:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS shares (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                payload BLOB NOT NULL,
+                delete_token TEXT NOT NULL,
+                views INTEGER NOT NULL DEFAULT 0
+            )"""
+        )
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts TEXT NOT NULL,
+                type TEXT NOT NULL,
+                share_id TEXT
+            )"""
+        )
+        con.commit()
+    finally:
+        con.close()
+
+
+def get_db():
+    con = sqlite3.connect(DB_PATH)
+    con.execute("PRAGMA busy_timeout=5000")
+    con.row_factory = sqlite3.Row
+    return con
+
+
+def log_event(con, event_type, share_id=None):
+    con.execute(
+        "INSERT INTO events (ts, type, share_id) VALUES (?, ?, ?)",
+        (datetime.now(timezone.utc).isoformat(), event_type, share_id),
+    )
+
+
+def base_url(request: Request) -> str:
+    override = os.environ.get("RAYFALL_BASE_URL")
+    if override:
+        return override.rstrip("/")
+    host = request.headers.get("host") or request.url.netloc
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    return f"{proto}://{host}"
+
+
+init_db()
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_home(request: Request):
-    return templates.TemplateResponse(request, "index.html")
+    return templates.TemplateResponse(request, "index.html", {"mode": "edit", "share_id": ""})
+
+
+class SharePayload(BaseModel):
+    v: int = 1
+    qsos: list
+    settings: dict = {}
+    view: dict = {}
+    meta: dict = {}
+
+
+@app.post("/api/share")
+def create_share(payload: SharePayload, request: Request):
+    if not payload.qsos:
+        raise HTTPException(status_code=400, detail="No QSOs to share")
+    if len(payload.qsos) > MAX_QSOS:
+        raise HTTPException(status_code=413, detail=f"Too many QSOs (limit {MAX_QSOS})")
+
+    raw = json.dumps(payload.model_dump(), separators=(",", ":")).encode("utf-8")
+    blob = gzip.compress(raw)
+    if len(blob) > MAX_COMPRESSED_BYTES:
+        raise HTTPException(status_code=413, detail="Shared map is too large")
+
+    delete_token = secrets.token_urlsafe(16)
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    con = get_db()
+    try:
+        share_id = None
+        for _ in range(5):
+            candidate = secrets.token_urlsafe(7)
+            try:
+                con.execute(
+                    "INSERT INTO shares (id, created_at, payload, delete_token) VALUES (?, ?, ?, ?)",
+                    (candidate, created_at, blob, delete_token),
+                )
+                share_id = candidate
+                break
+            except sqlite3.IntegrityError:
+                continue
+        if share_id is None:
+            raise HTTPException(status_code=500, detail="Could not allocate share id")
+        log_event(con, "create", share_id)
+        con.commit()
+    finally:
+        con.close()
+
+    root = base_url(request)
+    return {
+        "id": share_id,
+        "url": f"{root}/m/{share_id}",
+        "embed_url": f"{root}/embed/{share_id}",
+        "delete_token": delete_token,
+    }
+
+
+@app.get("/api/share/{share_id}")
+def get_share(share_id: str):
+    con = get_db()
+    try:
+        row = con.execute("SELECT payload FROM shares WHERE id = ?", (share_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Share not found")
+        con.execute("UPDATE shares SET views = views + 1 WHERE id = ?", (share_id,))
+        log_event(con, "view", share_id)
+        con.commit()
+    finally:
+        con.close()
+    return json.loads(gzip.decompress(row["payload"]).decode("utf-8"))
+
+
+@app.delete("/api/share/{share_id}")
+def delete_share(share_id: str, token: str = Query(default=None), x_delete_token: str = Header(default=None)):
+    supplied = token or x_delete_token
+    if not supplied:
+        raise HTTPException(status_code=400, detail="Missing delete token")
+    con = get_db()
+    try:
+        row = con.execute("SELECT delete_token FROM shares WHERE id = ?", (share_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Share not found")
+        if not secrets.compare_digest(row["delete_token"], supplied):
+            raise HTTPException(status_code=403, detail="Invalid delete token")
+        con.execute("DELETE FROM shares WHERE id = ?", (share_id,))
+        con.commit()
+    finally:
+        con.close()
+    return {"deleted": True}
+
+
+def _share_exists(share_id: str) -> bool:
+    con = get_db()
+    try:
+        return con.execute("SELECT 1 FROM shares WHERE id = ?", (share_id,)).fetchone() is not None
+    finally:
+        con.close()
+
+
+@app.get("/m/{share_id}", response_class=HTMLResponse)
+async def view_share(request: Request, share_id: str):
+    if not _share_exists(share_id):
+        raise HTTPException(status_code=404, detail="Share not found")
+    return templates.TemplateResponse(request, "index.html", {"mode": "view", "share_id": share_id})
+
+
+@app.get("/embed/{share_id}", response_class=HTMLResponse)
+async def embed_share(request: Request, share_id: str):
+    if not _share_exists(share_id):
+        raise HTTPException(status_code=404, detail="Share not found")
+    resp = templates.TemplateResponse(request, "index.html", {"mode": "embed", "share_id": share_id})
+    resp.headers["Content-Security-Policy"] = "frame-ancestors *"
+    return resp
+
 
 def dms_to_decimal(coord_str):
     """
@@ -33,6 +213,7 @@ def dms_to_decimal(coord_str):
         return round(decimal, 6)
     except Exception:
         return None  # If malformed or missing
+
 
 def parse_adif_block(adif_text: str):
     entries = adif_text.split("<eor>")
@@ -68,6 +249,7 @@ def parse_adif_block(adif_text: str):
             parsed_qsos.append(filtered_qso)
 
     return parsed_qsos
+
 
 @app.get("/api/logs")
 def get_logs(

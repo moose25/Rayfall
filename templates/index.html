@@ -451,24 +451,106 @@
         height: 60px;
       }
     }
+
+    /* ===== Share / view / embed additions ===== */
+    body[data-mode="view"] .edit-only,
+    body[data-mode="embed"] .edit-only { display: none !important; }
+
+    body[data-mode="embed"] .header-container,
+    body[data-mode="embed"] .footer-container,
+    body[data-mode="embed"] .top-right-buttons { display: none !important; }
+
+    .view-banner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: #2c2f5e;
+      border: 1px solid #444;
+      border-radius: 5px;
+      padding: 5px 12px;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    body[data-mode="view"] .view-banner { display: flex; }
+    .view-banner a { color: #FFC300; font-weight: 600; text-decoration: none; }
+    .view-banner a:hover { text-decoration: underline; }
+
+    .embed-badge {
+      display: none;
+      position: fixed;
+      bottom: 8px;
+      right: 8px;
+      z-index: 1200;
+      background: rgba(23, 28, 58, 0.85);
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+    .embed-badge a { color: #FFC300; text-decoration: none; font-weight: 600; }
+    body[data-mode="embed"] .embed-badge { display: block; }
+
+    .share-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1e234d;
+      padding: 22px;
+      border-radius: 8px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      z-index: 2000;
+      width: 90%;
+      max-width: 540px;
+      color: rgb(226, 220, 220);
+    }
+    .share-modal h2 { margin-top: 0; color: #FFC300; }
+    .share-modal label { display: block; font-size: 13px; margin: 14px 0 4px; color: #FFD700; }
+    .share-field { display: flex; gap: 8px; }
+    .share-field input, .share-field textarea {
+      flex: 1;
+      background: #2c2f5e;
+      color: rgb(226, 220, 220);
+      border: 1px solid #444;
+      border-radius: 5px;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      resize: none;
+    }
+    .share-field button, .share-modal .close-btn {
+      background: #2c2f5e;
+      color: rgb(226, 220, 220);
+      border: 1px solid #444;
+      border-radius: 5px;
+      padding: 8px 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .share-field button:hover, .share-modal .close-btn:hover { background: #3a4177; }
+    .share-modal .close-row { text-align: right; margin-top: 18px; }
   </style>
 </head>
-<body>
+<body data-mode="{{ mode or 'edit' }}" data-share-id="{{ share_id or '' }}">
   <div class="header-container">
     <div class="logo-section">
       <img src="/static/rayfall.png" alt="Rayfall Logo" />
       <h1>Rayfall</h1>
     </div>
     <div class="controls-section">
+      <div class="view-banner">📡 You're viewing a shared map. <a href="/">Create your own on Rayfall →</a></div>
       <div class="control-row">
-        <label for="start">Start:</label>
-        <input type="date" id="start" />
-        <label for="end">End:</label>
-        <input type="date" id="end" />
-        <button onclick="loadQSOs()">Load from QRZ</button>
-        <label>
-          <input type="file" id="adiFile" accept=".adi,.adif" onchange="loadADIFile()" /> Import ADI File
-        </label>
+        <span class="edit-only" style="display:contents;">
+          <label for="start">Start:</label>
+          <input type="date" id="start" />
+          <label for="end">End:</label>
+          <input type="date" id="end" />
+          <button onclick="loadQSOs()">Load from QRZ</button>
+          <label>
+            <input type="file" id="adiFile" accept=".adi,.adif" onchange="loadADIFile()" /> Import ADI File
+          </label>
+        </span>
         <div class="dropdown">
           <button class="dropdown-button" onclick="toggleDisplayOptions()">
             ⚙️ Display Options
@@ -559,6 +641,7 @@
           </div>
         </div>
         <button onclick="exportMap()">Export Map (300 DPI)</button>
+        <button class="edit-only" onclick="shareMap()">🔗 Share Map</button>
       </div>
       <div class="filter-row">
         <div><strong>QSOs shown: <span id="qsoCount">0</span></strong></div>
@@ -672,11 +755,29 @@
 
   <div class="top-right-buttons">
     <button onclick="openHelpModal()">📖 How to Use Rayfall</button>
-    <button onclick="openApiModal()">🔑 Change API Key</button>
+    <button class="edit-only" onclick="openApiModal()">🔑 Change API Key</button>
   </div>
 
 
   <div id="map"></div>
+
+  <div class="embed-badge"><a href="/m/{{ share_id }}" target="_blank" rel="noopener">⚡ View on Rayfall</a></div>
+
+  <div id="shareModal" class="share-modal">
+    <h2>🔗 Share this map</h2>
+    <p style="font-size:13px; color:#bbb; margin:0;">A read-only snapshot of your current map. Anyone with the link can view it.</p>
+    <label for="shareLink">Shareable link</label>
+    <div class="share-field">
+      <input type="text" id="shareLink" readonly />
+      <button onclick="copyShareField('shareLink', this)">Copy</button>
+    </div>
+    <label for="embedCode">Embed code (paste into a web page or your QRZ.com bio)</label>
+    <div class="share-field">
+      <textarea id="embedCode" rows="3" readonly></textarea>
+      <button onclick="copyShareField('embedCode', this)">Copy</button>
+    </div>
+    <div class="close-row"><button class="close-btn" onclick="closeShareModal()">Close</button></div>
+  </div>
 
   <div class="footer-container">
     <div style="color:grey; font-size:13px;">
@@ -1372,6 +1473,142 @@
         });
       }, 500);
     }
+
+    // ---- Share / embed ----
+    function gatherSnapshot() {
+      const bands = Array.from(document.querySelectorAll("#bandFilters input:checked")).map(cb => cb.value);
+      const modes = Array.from(document.querySelectorAll("#modeFilters input:checked")).map(cb => cb.value);
+      const c = map.getCenter();
+      return {
+        v: 1,
+        qsos: currentQSOs,
+        settings: {
+          basemap: document.getElementById('basemapSelector').value,
+          showLines: document.getElementById('showLines').checked,
+          colorByBand: document.getElementById('colorByBand').checked,
+          showQTH: document.getElementById('showQTH').checked,
+          qthIcon: currentQTHIcon,
+          showPins: document.getElementById('showPins').checked,
+          pinStyle: currentPinStyle,
+          pinColor: customPinColor,
+          showGridSquares: document.getElementById('showGridSquares').checked,
+          gridPrecision: document.getElementById('gridPrecision').value,
+          gridColor: gridStyleConfig.color,
+          gridOpacity: Math.round(gridStyleConfig.opacity * 100),
+          showGridLabels: gridStyleConfig.showLabels,
+          gridLabelBackground: gridStyleConfig.labelBackground,
+          bands: bands,
+          modes: modes
+        },
+        view: { center: [c.lat, c.lng], zoom: map.getZoom() }
+      };
+    }
+
+    function shareMap() {
+      if (!currentQSOs.length) { alert("Load some QSOs first, then share."); return; }
+      fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gatherSnapshot())
+      })
+        .then(r => { if (!r.ok) throw new Error('status ' + r.status); return r.json(); })
+        .then(d => showShareModal(d))
+        .catch(e => alert('Could not create share link: ' + e.message));
+    }
+
+    function showShareModal(d) {
+      document.getElementById('shareLink').value = d.url;
+      document.getElementById('embedCode').value =
+        `<iframe src="${d.embed_url}" width="100%" height="500" style="border:0;border-radius:8px;" title="Rayfall QSO map" loading="lazy"></iframe>`;
+      try {
+        const saved = JSON.parse(localStorage.getItem('rayfallShares') || '{}');
+        saved[d.id] = d.delete_token;
+        localStorage.setItem('rayfallShares', JSON.stringify(saved));
+      } catch (e) {}
+      document.getElementById('shareModal').style.display = 'block';
+    }
+
+    function closeShareModal() {
+      document.getElementById('shareModal').style.display = 'none';
+    }
+
+    function copyShareField(id, btn) {
+      const el = document.getElementById(id);
+      el.select();
+      const done = () => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(el.value).then(done).catch(() => { document.execCommand('copy'); done(); });
+      } else {
+        document.execCommand('copy');
+        done();
+      }
+    }
+
+    // ---- Shared-map viewer ----
+    function setCheck(id, val) {
+      const el = document.getElementById(id);
+      if (el && typeof val === 'boolean') el.checked = val;
+    }
+
+    function applyFilterChecks(containerId, allowed) {
+      const lower = allowed.map(x => String(x).toLowerCase());
+      document.querySelectorAll('#' + containerId + ' input[type="checkbox"]').forEach(cb => {
+        cb.checked = lower.includes(cb.value.toLowerCase());
+      });
+    }
+
+    function applySnapshot(data) {
+      const s = data.settings || {};
+      if (s.basemap) { document.getElementById('basemapSelector').value = s.basemap; switchBaseMap(s.basemap); }
+      setCheck('showLines', s.showLines);
+      setCheck('colorByBand', s.colorByBand);
+      setCheck('showQTH', s.showQTH);
+      setCheck('showPins', s.showPins);
+      setCheck('showGridSquares', s.showGridSquares);
+      setCheck('showGridLabels', s.showGridLabels);
+      setCheck('gridLabelBackground', s.gridLabelBackground);
+      if (s.qthIcon) {
+        document.getElementById('qthIconSelector').value = s.qthIcon;
+        currentQTHIcon = s.qthIcon;
+        document.getElementById('qthIconPreview').textContent = s.qthIcon;
+      }
+      if (s.pinStyle) { document.getElementById('pinStyleSelector').value = s.pinStyle; currentPinStyle = s.pinStyle; }
+      if (s.pinColor) { document.getElementById('pinColor').value = s.pinColor; customPinColor = s.pinColor; }
+      if (s.gridPrecision) document.getElementById('gridPrecision').value = s.gridPrecision;
+      if (s.gridColor) { document.getElementById('gridColor').value = s.gridColor; gridStyleConfig.color = s.gridColor; }
+      if (typeof s.gridOpacity === 'number') {
+        document.getElementById('gridOpacity').value = s.gridOpacity;
+        document.getElementById('gridOpacityDisplay').textContent = s.gridOpacity + '%';
+        gridStyleConfig.opacity = s.gridOpacity / 100;
+      }
+      gridStyleConfig.showLabels = !!s.showGridLabels;
+      gridStyleConfig.labelBackground = !!s.gridLabelBackground;
+
+      populateFilters(data.qsos || []);
+      if (Array.isArray(s.bands)) applyFilterChecks('bandFilters', s.bands);
+      if (Array.isArray(s.modes)) applyFilterChecks('modeFilters', s.modes);
+
+      filterQSOs();
+
+      if (data.view && Array.isArray(data.view.center)) {
+        map.setView(data.view.center, data.view.zoom || 4);
+      }
+    }
+
+    function bootstrapViewer() {
+      const shareId = document.body.getAttribute('data-share-id');
+      if (!shareId) return;
+      fetch('/api/share/' + encodeURIComponent(shareId))
+        .then(r => { if (!r.ok) throw new Error('status ' + r.status); return r.json(); })
+        .then(data => applySnapshot(data))
+        .catch(e => { console.error('Failed to load shared map:', e); alert('This shared map could not be loaded.'); });
+    }
+
+    document.addEventListener('DOMContentLoaded', bootstrapViewer);
 
   </script>
 </body>
