@@ -317,7 +317,8 @@ def parse_adif_block(adif_text: str):
                 "lat": dms_to_decimal(qso.get("lat", "")),
                 "lon": dms_to_decimal(qso.get("lon", "")),
                 "my_lat": dms_to_decimal(qso.get("my_lat", "")),
-                "my_lon": dms_to_decimal(qso.get("my_lon", ""))
+                "my_lon": dms_to_decimal(qso.get("my_lon", "")),
+                "my_gridsquare": qso.get("my_gridsquare"),
             }
             parsed_qsos.append(filtered_qso)
 

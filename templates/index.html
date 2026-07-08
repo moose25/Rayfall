@@ -858,7 +858,7 @@
     baseLayers[key].addTo(map);
     }
 
-    let qthMarker = null;
+    let qthMarkers = [];
     let currentPinStyle = 'teardrop';
     let currentQTHIcon = '⚡';
     let customPinColor = '#3399FF';
@@ -994,9 +994,10 @@
             lat: qso.lat ? dmsToDecimal(qso.lat) : null,
             lon: qso.lon ? dmsToDecimal(qso.lon) : null,
             my_lat: qso.my_lat ? dmsToDecimal(qso.my_lat) : null,
-            my_lon: qso.my_lon ? dmsToDecimal(qso.my_lon) : null
+            my_lon: qso.my_lon ? dmsToDecimal(qso.my_lon) : null,
+            my_gridsquare: qso.my_gridsquare || null
           };
-          
+
           qsos.push(parsedQSO);
         }
       });
@@ -1102,6 +1103,20 @@
 
     function plotQSOs(qsos) {
     document.getElementById("qsoCount").textContent = qsos.length;
+
+    // QRZ ADIF exports often omit MY_LAT/MY_LON and only include MY_GRIDSQUARE;
+    // derive the operator position from the grid centre so the QTH still plots
+    // and per-QSO lines have an origin. Covers QRZ fetch, ADIF upload, and shared payloads.
+    qsos.forEach(qso => {
+      if ((!qso.my_lat || !qso.my_lon) && qso.my_gridsquare) {
+        const b = maidenheadToLatLon(qso.my_gridsquare);
+        if (b) {
+          qso.my_lat = b.center[0];
+          qso.my_lon = b.center[1];
+        }
+      }
+    });
+
     placeQTHMarkerFromLogs(qsos);
 
     // Collect worked grid squares with selected precision
@@ -1229,28 +1244,49 @@
 
     function placeQTHMarkerFromLogs(qsos) {
     const showQTH = document.getElementById("showQTH").checked;
-    
-    // Remove existing QTH marker if present
-    if (qthMarker) {
-      map.removeLayer(qthMarker);
-      qthMarker = null;
-    }
-    
-    // Only place QTH marker if checkbox is checked
+
+    // Remove any previously placed QTH markers
+    qthMarkers.forEach(m => map.removeLayer(m));
+    qthMarkers = [];
+
     if (!showQTH) return;
-    
-    const firstValid = qsos.find(qso => qso.my_lat && qso.my_lon);
-    if (firstValid) {
-        qthMarker = L.marker([firstValid.my_lat, firstValid.my_lon], {
+
+    // Group QSOs by unique QTH. Prefer my_gridsquare (6-char precision, ~5x3 km)
+    // so nearby portable stops from the same location collapse into one marker,
+    // and fall back to rounded lat/lon when only coordinates are available.
+    const groups = new Map();
+    qsos.forEach(qso => {
+      if (!qso.my_lat || !qso.my_lon) return;
+      const gridKey = qso.my_gridsquare
+        ? qso.my_gridsquare.toUpperCase().substring(0, 6)
+        : null;
+      const key = gridKey || `${qso.my_lat.toFixed(3)},${qso.my_lon.toFixed(3)}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { lat: qso.my_lat, lon: qso.my_lon, grid: gridKey, count: 0 };
+        groups.set(key, group);
+      }
+      group.count += 1;
+    });
+
+    groups.forEach(group => {
+      const popupHtml = `
+        <div style="line-height: 1.5;">
+          <b>QTH</b><br>
+          ${group.grid ? `<b>Grid:</b> ${group.grid}<br>` : ''}
+          <b>QSOs from here:</b> ${group.count}
+        </div>`;
+      const marker = L.marker([group.lat, group.lon], {
         icon: L.divIcon({
-            className: 'custom-qth-icon',
-            html: `<div style="font-size: 32px; text-shadow: 1px 1px 4px black;">${currentQTHIcon}</div>`,
-            iconSize: [24, 24],
-            iconAnchor: [16, 16]
+          className: 'custom-qth-icon',
+          html: `<div style="font-size: 32px; text-shadow: 1px 1px 4px black;">${currentQTHIcon}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [16, 16]
         }),
         zIndexOffset: 1000
-        }).addTo(map);
-    }
+      }).bindPopup(popupHtml).addTo(map);
+      qthMarkers.push(marker);
+    });
     }
 
     function filterQSOs() {
