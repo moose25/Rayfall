@@ -1304,9 +1304,12 @@
         markers.push(marker);
 
         if (document.getElementById("showLines").checked && qso.my_lat && qso.my_lon) {
+        // Match line color to the pin when "Color Pins by QTH" is on so each
+        // contact's line visually ties back to its originating station.
+        const lineColor = (useQTHColor && qthGroup) ? qthGroup.color : "grey";
         const outline = L.polyline(
           [[qso.my_lat, qso.my_lon], [markerLat, markerLon]],
-            { color: "grey", weight: 2, opacity: 1 }
+            { color: lineColor, weight: 2, opacity: 1 }
         ).addTo(map);
         lines.push(outline);
         }
