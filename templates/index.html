@@ -735,9 +735,9 @@
       <p>Click the <strong>"⚙️ Display Options"</strong> button to access:</p>
       <ul>
         <li><strong>Map Style:</strong> Choose Light, Dark, Topographic, Satellite, or Streets</li>
-        <li><strong>QTH Station Icon:</strong> Select from ⚡ 📍 🏠 📡 🗼 ⭐</li>
+        <li><strong>QTH Station Icon:</strong> Clean shapes (Dot, Plus, Square, Signal) or emoji (⚡ 📍 🏠 📡 🗼 ⭐), plus a color picker and an optional grid label under each marker</li>
         <li><strong>Pin Icons:</strong> Change marker style (Teardrop, Circle, Square, Star)</li>
-        <li><strong>Grid Squares:</strong> 
+        <li><strong>Grid Squares:</strong>
           <ul>
             <li>Toggle grid square overlay on/off</li>
             <li>Choose 4-character or 6-character precision</li>
@@ -749,12 +749,23 @@
     </div>
 
     <div class="help-section">
+      <h3>📡 Multiple QTHs</h3>
+      <p>Operating from more than one location in a single log — travel, POTA, Field Day? Rayfall reads <code>MY_GRIDSQUARE</code> / <code>MY_LAT</code>/<code>MY_LON</code> from each QSO and groups them:</p>
+      <ul>
+        <li>Every unique QTH gets its own marker on the map (grouped at 6-character grid precision).</li>
+        <li>Each contact popup shows <strong>From QTH:</strong> so you always know where you were when you made the QSO.</li>
+        <li>Toggle <strong>Color Pins by QTH</strong> to color every contact by its originating station.</li>
+        <li>Use the <strong>QTHs</strong> filter row to isolate contacts from one trip stop.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
       <h3>🔍 Filtering Contacts</h3>
       <ul>
-        <li><strong>Show Lines:</strong> Toggle lines from your QTH to contacts</li>
+        <li><strong>Show Lines:</strong> Toggle lines from each QTH to its contacts</li>
         <li><strong>Color by Band:</strong> Color-code pins by frequency band</li>
-        <li><strong>Band Filters:</strong> Check/uncheck specific bands (20m, 40m, etc.)</li>
-        <li><strong>Mode Filters:</strong> Filter by mode (SSB, CW, FT8, etc.)</li>
+        <li><strong>Color by QTH:</strong> Color-code pins by originating station (wins if both are on)</li>
+        <li><strong>Band / Mode / QTH Filters:</strong> Check/uncheck to hide contacts by band, mode, or originating QTH</li>
       </ul>
       <p>The <strong>QSO counter</strong> updates live as you filter!</p>
     </div>
