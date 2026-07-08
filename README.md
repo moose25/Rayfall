@@ -20,17 +20,18 @@ Rayfall is a dynamic ham radio mapping interface that pulls your logbook data fr
   * QRZ API integration (supports multiple logbooks)
   * **NEW:** ADI/ADIF file import (no API key required!)
 * **Date range selection**
-* **Color-coded pins by band**
+* **Color-coded pins by band or by QTH**
+* **Multi-QTH support:** logs that span multiple locations (travel, POTA, Field Day) get a separate marker per QTH, plus a QTH filter row and per-QSO "From QTH" info
 * **Customizable display options:**
   * Multiple pin icon styles (teardrop, circle, square, star)
-  * Selectable QTH station icons (⚡📍🏠📡🗼⭐)
+  * QTH station icons: clean shapes (dot, plus, square, signal) or emoji, with a color picker and optional grid label
   * Custom grid square colors and opacity
   * Multiple basemap styles
 * **Grid square overlay with 4/6-character precision**
-* **Map lines to QSOs (toggle on/off)**
-* **Filter QSOs by band and mode**
+* **Map lines from each QTH to its QSOs (toggle on/off)**
+* **Filter QSOs by band, mode, or originating QTH**
 * **High-resolution map export (300 DPI for printing)**
-* **Auto-reads your QTH from log data**
+* **Auto-reads your QTH(s) from log data** (`MY_GRIDSQUARE`, `MY_LAT`/`MY_LON`)
 * **Clean dropdown menu for display options**
 * **Works offline with ADI files**
 
@@ -113,7 +114,8 @@ This starts the server locally at: `http://127.0.0.1:8000`
 
 Click the **"⚙️ Display Options"** button to access:
 - **Map Style**: Light, Dark, Topographic, Satellite, Streets
-- **QTH Icon**: Choose from 6 different station icons
+- **QTH Icon**: Clean shapes (Dot, Plus, Square, Signal) or emoji, with a color picker and optional grid label under each marker
+- **Color Pins by QTH**: color every contact by the QTH it was made from (great for multi-location trips)
 - **Pin Style**: Teardrop, Circle, Square, or Star markers
 - **Grid Squares**: Custom colors, opacity, and precision (4 or 6 chars)
 
@@ -154,7 +156,7 @@ To generate a QRZ Logbook API Key:
 
 ### Change the Default Map Location
 
-Rayfall centers on VA by default. Once a valid log is loaded, it updates to your actual QTH using your first valid `my_lat` and `my_lon` from the QRZ logs.
+Rayfall centers on VA by default. Once a valid log is loaded, it updates to your actual QTH using the first valid `MY_LAT`/`MY_LON` (or the centre of `MY_GRIDSQUARE`) from the log. Logs that span multiple QTHs will show one marker per location.
 
 If you'd like to hardcode a default starting location, edit:
 
