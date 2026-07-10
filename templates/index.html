@@ -1791,9 +1791,30 @@
       exportButton.disabled = true;
       exportButton.textContent = 'Exporting...';
 
-      // Standard letter landscape at 300 DPI: 11 x 8.5 inches = 3300 x 2550 pixels
-      const printWidth = 3300;
-      const printHeight = 2550;
+      // No selection → default letter landscape at 300 DPI (11 x 8.5 in).
+      // With a selection → match its on-screen aspect ratio so the JPEG is
+      // cropped to the selected shape instead of centering it inside a fixed
+      // landscape canvas. Capped at 3300 px on the longer side to keep the
+      // output roughly 300 DPI at letter size.
+      let printWidth = 3300;
+      let printHeight = 2550;
+      if (selectedExportBounds) {
+        const nw = map.latLngToContainerPoint(selectedExportBounds.getNorthWest());
+        const se = map.latLngToContainerPoint(selectedExportBounds.getSouthEast());
+        const w = Math.abs(se.x - nw.x);
+        const h = Math.abs(se.y - nw.y);
+        if (w > 0 && h > 0) {
+          const aspect = w / h;
+          const maxSide = 3300;
+          if (aspect >= 1) {
+            printWidth = maxSide;
+            printHeight = Math.round(maxSide / aspect);
+          } else {
+            printHeight = maxSide;
+            printWidth = Math.round(maxSide * aspect);
+          }
+        }
+      }
 
       const originalWidth = mapElement.style.width;
       const originalHeight = mapElement.style.height;
