@@ -1797,6 +1797,10 @@
 
       const originalWidth = mapElement.style.width;
       const originalHeight = mapElement.style.height;
+      const originalPosition = mapElement.style.position;
+      const originalTop = mapElement.style.top;
+      const originalLeft = mapElement.style.left;
+      const originalZIndex = mapElement.style.zIndex;
       const originalScrollX = window.scrollX;
       const originalScrollY = window.scrollY;
       const originalCenter = map.getCenter();
@@ -1805,23 +1809,38 @@
       const hadRect = !!selectedExportRect;
       if (hadRect) map.removeLayer(selectedExportRect);
 
+      // Detach from the body's flex layout for the capture. Inline width/height
+      // don't fully override flex sizing constraints, so previously the map
+      // rendered smaller than 3300 x 2550 even though we asked for that size —
+      // html2canvas then filled the un-covered region with backgroundColor,
+      // producing the leftover blue bar. position:fixed at (0,0) with an
+      // explicit size guarantees the element is exactly print-size.
+      mapElement.style.position = 'fixed';
+      mapElement.style.top = '0';
+      mapElement.style.left = '0';
+      mapElement.style.zIndex = '9999';
       mapElement.style.width = printWidth + 'px';
       mapElement.style.height = printHeight + 'px';
-      // Scroll to the top-left so html2canvas paints from a stable origin —
-      // otherwise the resized map may sit partly below the viewport and get
-      // clipped, which is what produced the giant blue banner in issue #12.
       window.scrollTo(0, 0);
-      map.invalidateSize();
+      // Non-animated so Leaflet snaps to the new size instead of transitioning.
+      map.invalidateSize({ pan: false, animate: false });
       // If a selection is set, fit the map to it now that the container is at
       // print size (Leaflet computes fit against the current container).
       if (selectedExportBounds) {
         map.fitBounds(selectedExportBounds, { animate: false, padding: [0, 0] });
+        // Second invalidate: fitBounds may have re-laid tiles; make sure Leaflet
+        // has recomputed the layout at the print size before we start polling.
+        map.invalidateSize({ pan: false, animate: false });
       }
 
       const cleanup = () => {
         mapElement.style.width = originalWidth;
         mapElement.style.height = originalHeight;
-        map.invalidateSize();
+        mapElement.style.position = originalPosition;
+        mapElement.style.top = originalTop;
+        mapElement.style.left = originalLeft;
+        mapElement.style.zIndex = originalZIndex;
+        map.invalidateSize({ pan: false, animate: false });
         map.setView(originalCenter, originalZoom, { animate: false });
         if (hadRect && selectedExportBounds) {
           selectedExportRect = L.rectangle(selectedExportBounds, {
@@ -1859,25 +1878,53 @@
         });
       };
 
-      // Wait for the active base tile layer to finish loading tiles for the
-      // resized viewport before capturing. Previously the export used a fixed
-      // 500 ms wait — nowhere near enough time to fetch tiles for a 3300 x 2550
-      // area, so html2canvas ran while most of the canvas was still empty and
-      // filled the un-tiled region with backgroundColor. That is the "blue
-      // banner" reported in issue #12.
-      const activeLayer = baseLayers[document.getElementById('basemapSelector').value];
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        activeLayer.off('load', finish);
-        clearTimeout(safety);
-        // One extra frame so the last tile paints before html2canvas snapshots.
-        setTimeout(doCapture, 100);
+      // Poll for tile images to actually finish loading, instead of relying on
+      // Leaflet's TileLayer 'load' event. The event fires when the layer's
+      // *current* pending set clears, but resize + fitBounds can trigger
+      // multiple back-to-back fetch cycles — 'load' may fire early for the
+      // first cycle while the second cycle is still in flight. That race is
+      // what left blue/white gaps in the exported JPEG.
+      const startWait = Date.now();
+      const minWaitMs = 1200;   // absorb Leaflet's post-fitBounds re-tiling
+      const maxWaitMs = 15000;  // safety cap
+      const stableFramesNeeded = 2;
+      let stableFrames = 0;
+      let previousCount = -1;
+
+      const areTilesReady = () => {
+        const tiles = mapElement.querySelectorAll('img.leaflet-tile');
+        if (tiles.length === 0) return false;
+        for (const img of tiles) {
+          if (!img.complete || img.naturalWidth === 0) return false;
+        }
+        return true;
       };
-      // Cap the wait so a slow tile server can't hang the export button.
-      const safety = setTimeout(finish, 10000);
-      activeLayer.on('load', finish);
+
+      const check = () => {
+        const elapsed = Date.now() - startWait;
+        const ready = areTilesReady();
+        const currentCount = mapElement.querySelectorAll('img.leaflet-tile').length;
+
+        // Require the tile set to be stable across two ticks — Leaflet may add
+        // new <img> nodes after fitBounds settles, and we don't want to capture
+        // between waves.
+        if (ready && currentCount === previousCount) stableFrames++;
+        else stableFrames = 0;
+        previousCount = currentCount;
+
+        if (ready && elapsed >= minWaitMs && stableFrames >= stableFramesNeeded) {
+          // One more frame so the last tile paints, then capture.
+          setTimeout(doCapture, 100);
+          return;
+        }
+        if (elapsed >= maxWaitMs) {
+          console.warn('Export: tile-wait max reached, capturing anyway');
+          setTimeout(doCapture, 100);
+          return;
+        }
+        setTimeout(check, 200);
+      };
+      check();
     }
 
     // ---- Share / embed ----
