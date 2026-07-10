@@ -171,6 +171,42 @@
       border: none;
     }
 
+    .map-legend {
+      position: absolute;
+      right: 12px;
+      bottom: 30px;
+      z-index: 500;
+      background: rgba(30, 35, 77, 0.92);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.4;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      max-height: 45%;
+      overflow-y: auto;
+      max-width: 220px;
+    }
+    .map-legend-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+      letter-spacing: 0.4px;
+    }
+    .map-legend-items {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 8px;
+      row-gap: 3px;
+      align-items: center;
+    }
+    .map-legend-swatch {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
     /* Dropdown Menu Styles */
     .dropdown {
       position: relative;
@@ -594,6 +630,9 @@
               <label class="lines-toggle">
                 <input type="checkbox" id="colorByQTH" onchange="filterQSOs()" /> Color Pins by QTH
               </label>
+              <label class="lines-toggle">
+                <input type="checkbox" id="showLegend" onchange="updateLegend()" /> Show Legend
+              </label>
             </div>
             <div class="dropdown-section">
               <h4>QTH Station Icon</h4>
@@ -804,7 +843,12 @@
   </div>
 
 
-  <div id="map"></div>
+  <div id="map">
+    <div id="mapLegend" class="map-legend" style="display:none;">
+      <div class="map-legend-title" id="mapLegendTitle"></div>
+      <div class="map-legend-items" id="mapLegendItems"></div>
+    </div>
+  </div>
 
   <div class="embed-badge"><a href="/m/{{ share_id }}" target="_blank" rel="noopener">⚡ View on Rayfall</a></div>
 
@@ -1314,6 +1358,8 @@
         lines.push(outline);
         }
     });
+
+    updateLegend(qsos);
     }
 
     // Create pin icons based on style
@@ -1436,6 +1482,41 @@
 
     function toggleLines() {
     filterQSOs();
+    }
+
+    function updateLegend(qsosArg) {
+      const legend = document.getElementById('mapLegend');
+      const showLegend = document.getElementById('showLegend').checked;
+      if (!showLegend) { legend.style.display = 'none'; return; }
+
+      const colorByQTH = document.getElementById('colorByQTH').checked;
+      const colorByBand = document.getElementById('colorByBand').checked;
+      const items = [];
+      let title = '';
+
+      // Mirror the pin-coloring rule: QTH wins when both are on.
+      if (colorByQTH && qthIndex.size > 0) {
+        title = 'QTHs';
+        Array.from(qthIndex.values())
+          .sort((a, b) => a.index - b.index)
+          .forEach(g => items.push({ color: g.color, label: `${g.label} (${g.count})` }));
+      } else if (colorByBand) {
+        title = 'Bands';
+        const qsos = qsosArg || currentQSOs;
+        const bandsSeen = new Set();
+        qsos.forEach(q => { if (q.band) bandsSeen.add(q.band.toLowerCase()); });
+        Array.from(bandsSeen).sort().forEach(b => {
+          items.push({ color: bandColors[b] || '#999', label: b });
+        });
+      }
+
+      if (!items.length) { legend.style.display = 'none'; return; }
+
+      document.getElementById('mapLegendTitle').textContent = title;
+      document.getElementById('mapLegendItems').innerHTML = items.map(i =>
+        `<span class="map-legend-swatch" style="background:${i.color}"></span><span>${i.label}</span>`
+      ).join('');
+      legend.style.display = '';
     }
 
     // Grid Square Functions
@@ -1693,6 +1774,7 @@
           colorByQTH: document.getElementById('colorByQTH').checked,
           showQTH: document.getElementById('showQTH').checked,
           showQTHLabels: document.getElementById('showQTHLabels').checked,
+          showLegend: document.getElementById('showLegend').checked,
           qthIcon: currentQTHIcon,
           qthIconColor: document.getElementById('qthIconColor').value,
           showPins: document.getElementById('showPins').checked,
@@ -1782,6 +1864,7 @@
       setCheck('colorByQTH', s.colorByQTH);
       setCheck('showQTH', s.showQTH);
       setCheck('showQTHLabels', s.showQTHLabels);
+      setCheck('showLegend', s.showLegend);
       setCheck('showPins', s.showPins);
       setCheck('showGridSquares', s.showGridSquares);
       setCheck('showGridLabels', s.showGridLabels);
