@@ -1826,6 +1826,13 @@
       const originalScrollY = window.scrollY;
       const originalCenter = map.getCenter();
       const originalZoom = map.getZoom();
+      // Temporarily allow fractional zoom for the export. With the default
+      // zoomSnap: 1, fitBounds rounds down to an integer zoom, so a selection
+      // whose ideal fit is (say) zoom 6.5 gets rendered at zoom 6 — showing
+      // roughly 2x the selected area both ways. zoomSnap: 0 lets fitBounds
+      // pick the exact zoom that fills the container edge to edge.
+      const originalZoomSnap = map.options.zoomSnap;
+      map.options.zoomSnap = 0;
       // Hide the selection outline for the capture; restore afterward.
       const hadRect = !!selectedExportRect;
       if (hadRect) map.removeLayer(selectedExportRect);
@@ -1861,6 +1868,7 @@
         mapElement.style.top = originalTop;
         mapElement.style.left = originalLeft;
         mapElement.style.zIndex = originalZIndex;
+        map.options.zoomSnap = originalZoomSnap;
         map.invalidateSize({ pan: false, animate: false });
         map.setView(originalCenter, originalZoom, { animate: false });
         if (hadRect && selectedExportBounds) {
