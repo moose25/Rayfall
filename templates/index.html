@@ -171,6 +171,12 @@
       border: none;
     }
 
+    #map.selecting-area,
+    #map.selecting-area .leaflet-grab,
+    #map.selecting-area .leaflet-interactive {
+      cursor: crosshair !important;
+    }
+
     .map-legend {
       position: absolute;
       right: 12px;
@@ -711,6 +717,8 @@
             </div>
           </div>
         </div>
+        <button id="selectAreaButton" onclick="toggleSelectArea()">📐 Select Export Area</button>
+        <button id="clearAreaButton" onclick="clearSelectArea()" style="display:none;">✕ Clear Area</button>
         <button onclick="exportMap(event)">Export Map (300 DPI)</button>
         <button class="edit-only" onclick="shareMap()">🔗 Share Map</button>
       </div>
@@ -1676,6 +1684,103 @@
       drawGridSquares();
     }
 
+    // ---- Export area selection ----
+    // When set, the Export button fits the map to these bounds before capturing.
+    let selectedExportBounds = null;
+    let selectedExportRect = null;
+    let selectingArea = false;
+
+    function toggleSelectArea() {
+      if (selectingArea) return exitSelectArea();
+      enterSelectArea();
+    }
+
+    function enterSelectArea() {
+      selectingArea = true;
+      const mapEl = document.getElementById('map');
+      mapEl.classList.add('selecting-area');
+      map.dragging.disable();
+      map.boxZoom.disable();
+      map.doubleClickZoom.disable();
+      document.getElementById('selectAreaButton').textContent = '✕ Cancel Selection';
+
+      let startLatLng = null;
+      let liveRect = null;
+
+      const onDown = e => {
+        // Prevent Leaflet's default handlers so we get a clean rubber-band.
+        L.DomEvent.stopPropagation(e);
+        L.DomEvent.preventDefault(e);
+        startLatLng = e.latlng;
+        liveRect = L.rectangle([startLatLng, startLatLng], {
+          color: '#FFD700', weight: 2, fillOpacity: 0.15
+        }).addTo(map);
+      };
+      const onMove = e => {
+        if (!startLatLng || !liveRect) return;
+        liveRect.setBounds(L.latLngBounds(startLatLng, e.latlng));
+      };
+      const onUp = e => {
+        if (!startLatLng) return;
+        // e may be a native event (document fallback) or a Leaflet event.
+        const endLatLng = e.latlng || map.mouseEventToLatLng(e);
+        const bounds = L.latLngBounds(startLatLng, endLatLng);
+        if (liveRect) map.removeLayer(liveRect);
+        startLatLng = null;
+        liveRect = null;
+        if (bounds.getNorth() === bounds.getSouth() || bounds.getEast() === bounds.getWest()) {
+          exitSelectArea();
+          return;
+        }
+        setSelectedBounds(bounds);
+        exitSelectArea();
+      };
+      const onKey = e => { if (e.key === 'Escape') exitSelectArea(); };
+
+      // Store handlers so we can remove them on exit. Attach mouseup to the
+      // document too, so releasing outside the map still finalises the drag.
+      enterSelectArea._handlers = { onDown, onMove, onUp, onKey };
+      map.on('mousedown', onDown);
+      map.on('mousemove', onMove);
+      map.on('mouseup', onUp);
+      document.addEventListener('mouseup', onUp);
+      document.addEventListener('keydown', onKey);
+    }
+
+    function exitSelectArea() {
+      selectingArea = false;
+      document.getElementById('map').classList.remove('selecting-area');
+      map.dragging.enable();
+      map.boxZoom.enable();
+      map.doubleClickZoom.enable();
+      document.getElementById('selectAreaButton').textContent = '📐 Select Export Area';
+      const h = enterSelectArea._handlers;
+      if (h) {
+        map.off('mousedown', h.onDown);
+        map.off('mousemove', h.onMove);
+        map.off('mouseup', h.onUp);
+        document.removeEventListener('mouseup', h.onUp);
+        document.removeEventListener('keydown', h.onKey);
+        enterSelectArea._handlers = null;
+      }
+    }
+
+    function setSelectedBounds(bounds) {
+      if (selectedExportRect) map.removeLayer(selectedExportRect);
+      selectedExportBounds = bounds;
+      selectedExportRect = L.rectangle(bounds, {
+        color: '#FFD700', weight: 2, dashArray: '6,4', fillOpacity: 0.08, interactive: false
+      }).addTo(map);
+      document.getElementById('clearAreaButton').style.display = '';
+    }
+
+    function clearSelectArea() {
+      if (selectedExportRect) map.removeLayer(selectedExportRect);
+      selectedExportRect = null;
+      selectedExportBounds = null;
+      document.getElementById('clearAreaButton').style.display = 'none';
+    }
+
     // Export Map Function
     function exportMap(evt) {
       const mapElement = document.getElementById('map');
@@ -1694,6 +1799,11 @@
       const originalHeight = mapElement.style.height;
       const originalScrollX = window.scrollX;
       const originalScrollY = window.scrollY;
+      const originalCenter = map.getCenter();
+      const originalZoom = map.getZoom();
+      // Hide the selection outline for the capture; restore afterward.
+      const hadRect = !!selectedExportRect;
+      if (hadRect) map.removeLayer(selectedExportRect);
 
       mapElement.style.width = printWidth + 'px';
       mapElement.style.height = printHeight + 'px';
@@ -1702,11 +1812,22 @@
       // clipped, which is what produced the giant blue banner in issue #12.
       window.scrollTo(0, 0);
       map.invalidateSize();
+      // If a selection is set, fit the map to it now that the container is at
+      // print size (Leaflet computes fit against the current container).
+      if (selectedExportBounds) {
+        map.fitBounds(selectedExportBounds, { animate: false, padding: [0, 0] });
+      }
 
       const cleanup = () => {
         mapElement.style.width = originalWidth;
         mapElement.style.height = originalHeight;
         map.invalidateSize();
+        map.setView(originalCenter, originalZoom, { animate: false });
+        if (hadRect && selectedExportBounds) {
+          selectedExportRect = L.rectangle(selectedExportBounds, {
+            color: '#FFD700', weight: 2, dashArray: '6,4', fillOpacity: 0.08, interactive: false
+          }).addTo(map);
+        }
         window.scrollTo(originalScrollX, originalScrollY);
         exportButton.disabled = false;
         exportButton.textContent = 'Export Map (300 DPI)';
