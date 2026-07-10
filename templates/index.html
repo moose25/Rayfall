@@ -672,7 +672,7 @@
             </div>
           </div>
         </div>
-        <button onclick="exportMap()">Export Map (300 DPI)</button>
+        <button onclick="exportMap(event)">Export Map (300 DPI)</button>
         <button class="edit-only" onclick="shareMap()">🔗 Share Map</button>
       </div>
       <div class="filter-row">
@@ -1596,27 +1596,42 @@
     }
 
     // Export Map Function
-    function exportMap() {
+    function exportMap(evt) {
       const mapElement = document.getElementById('map');
-      const exportButton = event.target;
+      // event.target is unreliable on Firefox when triggered from inline onclick;
+      // accept the explicit event arg, and fall back to the button by selector.
+      const exportButton = (evt && (evt.currentTarget || evt.target))
+        || document.querySelector('button[onclick^="exportMap"]');
       exportButton.disabled = true;
       exportButton.textContent = 'Exporting...';
-      
-      // Calculate dimensions for 300 DPI
-      // Standard print size: 8.5 x 11 inches at 300 DPI = 2550 x 3300 pixels
+
+      // Standard letter landscape at 300 DPI: 11 x 8.5 inches = 3300 x 2550 pixels
       const printWidth = 3300;
       const printHeight = 2550;
-      
-      // Save current size
+
       const originalWidth = mapElement.style.width;
       const originalHeight = mapElement.style.height;
-      
-      // Temporarily resize for high-res capture
+      const originalScrollX = window.scrollX;
+      const originalScrollY = window.scrollY;
+
       mapElement.style.width = printWidth + 'px';
       mapElement.style.height = printHeight + 'px';
+      // Scroll to the top-left so html2canvas paints from a stable origin —
+      // otherwise the resized map may sit partly below the viewport and get
+      // clipped, which is what produced the giant blue banner in issue #12.
+      window.scrollTo(0, 0);
       map.invalidateSize();
-      
-      setTimeout(() => {
+
+      const cleanup = () => {
+        mapElement.style.width = originalWidth;
+        mapElement.style.height = originalHeight;
+        map.invalidateSize();
+        window.scrollTo(originalScrollX, originalScrollY);
+        exportButton.disabled = false;
+        exportButton.textContent = 'Export Map (300 DPI)';
+      };
+
+      const doCapture = () => {
         html2canvas(mapElement, {
           useCORS: true,
           allowTaint: true,
@@ -1625,7 +1640,6 @@
           height: printHeight,
           backgroundColor: '#171c3a'
         }).then(canvas => {
-          // Convert to blob and download
           canvas.toBlob(blob => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -1634,28 +1648,34 @@
             link.href = url;
             link.click();
             URL.revokeObjectURL(url);
-            
-            // Restore original size
-            mapElement.style.width = originalWidth;
-            mapElement.style.height = originalHeight;
-            map.invalidateSize();
-            
-            exportButton.disabled = false;
-            exportButton.textContent = 'Export Map (300 DPI)';
+            cleanup();
           }, 'image/jpeg', 0.95);
         }).catch(err => {
           console.error('Export failed:', err);
           alert('Export failed. Please try again.');
-          
-          // Restore original size
-          mapElement.style.width = originalWidth;
-          mapElement.style.height = originalHeight;
-          map.invalidateSize();
-          
-          exportButton.disabled = false;
-          exportButton.textContent = 'Export Map (300 DPI)';
+          cleanup();
         });
-      }, 500);
+      };
+
+      // Wait for the active base tile layer to finish loading tiles for the
+      // resized viewport before capturing. Previously the export used a fixed
+      // 500 ms wait — nowhere near enough time to fetch tiles for a 3300 x 2550
+      // area, so html2canvas ran while most of the canvas was still empty and
+      // filled the un-tiled region with backgroundColor. That is the "blue
+      // banner" reported in issue #12.
+      const activeLayer = baseLayers[document.getElementById('basemapSelector').value];
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        activeLayer.off('load', finish);
+        clearTimeout(safety);
+        // One extra frame so the last tile paints before html2canvas snapshots.
+        setTimeout(doCapture, 100);
+      };
+      // Cap the wait so a slow tile server can't hang the export button.
+      const safety = setTimeout(finish, 10000);
+      activeLayer.on('load', finish);
     }
 
     // ---- Share / embed ----
