@@ -1889,20 +1889,27 @@
       };
 
       const doCapture = () => {
-        // Force Leaflet's SVG vector layers (polylines, rectangles) to redraw
-        // with the current projection so html2canvas sees up-to-date path
-        // coordinates. DOM markers reproject instantly via CSS but SVG path
-        // `d` attributes lag by an animation frame (issue #19).
-        //
-        // Only Path subclasses — do NOT call redraw() on TileLayer. On tile
-        // layers `redraw()` removes every tile and re-fetches it, which put
-        // the exporter back in the "empty white tiles + wrong-positioned
-        // vectors" state we already fixed in earlier PRs.
-        map.eachLayer(layer => {
-          if (layer instanceof L.Path) {
-            try { layer.redraw(); } catch (e) { /* non-fatal */ }
-          }
+        // html2canvas + Leaflet's SVG overlay is unreliable at fractional
+        // zoom after fitBounds — the SVG pane's translate3d transform gets
+        // dropped, so every polyline renders with a consistent pixel shift
+        // (issue #19 kept coming back with different symptoms: converged-to-
+        // wrong-point, then Sterling-VA lines starting at Michigan, then
+        // vertical stripe artifacts). Rather than fight the SVG snapshot,
+        // capture the map without polylines and draw the lines onto the
+        // resulting canvas ourselves, using latLngToContainerPoint against
+        // the current map view — pixel-perfect, deterministic, no transform
+        // confusion.
+        const lineSnapshots = lines.map(l => {
+          const pts = l.getLatLngs().map(ll => map.latLngToContainerPoint(ll));
+          return {
+            points: pts.map(p => ({ x: p.x, y: p.y })),
+            color: l.options.color || 'grey',
+            weight: l.options.weight || 2,
+            opacity: l.options.opacity != null ? l.options.opacity : 1
+          };
         });
+        const linesToRestore = lines.slice();
+        linesToRestore.forEach(l => map.removeLayer(l));
 
         html2canvas(mapElement, {
           useCORS: true,
@@ -1912,6 +1919,31 @@
           height: printHeight,
           backgroundColor: '#171c3a'
         }).then(canvas => {
+          // Redraw lines onto the captured canvas at their known pixel
+          // positions. html2canvas at scale:1 produces a canvas whose
+          // dimensions match the element's rect, so container coords map 1:1.
+          const ctx = canvas.getContext('2d');
+          lineSnapshots.forEach(l => {
+            if (l.points.length < 2) return;
+            ctx.save();
+            ctx.strokeStyle = l.color;
+            ctx.lineWidth = l.weight;
+            ctx.globalAlpha = l.opacity;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(l.points[0].x, l.points[0].y);
+            for (let i = 1; i < l.points.length; i++) {
+              ctx.lineTo(l.points[i].x, l.points[i].y);
+            }
+            ctx.stroke();
+            ctx.restore();
+          });
+
+          // Put the polylines back on the live map before we hand the JPEG
+          // to the browser.
+          linesToRestore.forEach(l => l.addTo(map));
+
           canvas.toBlob(blob => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -1925,6 +1957,8 @@
         }).catch(err => {
           console.error('Export failed:', err);
           alert('Export failed. Please try again.');
+          // Still restore lines even if capture failed.
+          linesToRestore.forEach(l => { if (!map.hasLayer(l)) l.addTo(map); });
           cleanup();
         });
       };
