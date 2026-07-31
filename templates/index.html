@@ -739,6 +739,7 @@
         <button id="selectAreaButton" onclick="toggleSelectArea()">📐 Select Export Area</button>
         <button id="clearAreaButton" onclick="clearSelectArea()" style="display:none;">✕ Clear Area</button>
         <button onclick="exportMap(event)">Export Map (300 DPI)</button>
+        <button onclick="exportKML()" title="Open your contacts in Google Earth">🌍 Export KML</button>
         <button class="edit-only" onclick="shareMap()">🔗 Share Map</button>
       </div>
       <div class="filter-row">
@@ -846,6 +847,7 @@
         <li>Perfect for printing at 11"×8.5"!</li>
       </ol>
       <p><strong>Tip:</strong> Hide pins and show only grid squares for clean award maps!</p>
+      <p><strong>Big log? Try KML:</strong> Click <strong>"🌍 Export KML"</strong> to download your QTHs, contacts, and QSO paths for Google Earth — free zoom and pan over the whole world at full detail. Respects your current band/mode/QTH filters.</p>
     </div>
 
     <div class="help-section">
@@ -2147,6 +2149,107 @@
         setTimeout(check, 200);
       };
       check();
+    }
+
+    // ---- KML export (Google Earth) ----
+    function xmlEscape(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    }
+
+    // KML colors are aabbggrr (alpha, blue, green, red) — reversed from CSS.
+    function cssToKmlColor(hex, alpha) {
+      const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+      if (!m) return (alpha || 'ff') + 'ffffff';
+      return (alpha || 'ff') + m[3] + m[2] + m[1];
+    }
+
+    // Export the currently filtered contacts as KML: one folder of QTH
+    // placemarks, one of contacts, one of QSO paths (colored per QTH).
+    // Runs fully client-side, so it works offline — Google Earth then
+    // provides free zoom/pan/tilt over the whole log, which is a much
+    // better "whole world at full detail" view than any fixed-size image.
+    function exportKML() {
+      if (!markers.length) { alert('Load some QSOs first, then export.'); return; }
+
+      const qsos = markers.map(m => m.qso).filter(Boolean);
+      const usedQTHs = new Map();  // key -> {group, count}
+      qsos.forEach(q => {
+        const key = qthKeyOf(q);
+        const group = key ? qthIndex.get(key) : null;
+        if (!group) return;
+        const entry = usedQTHs.get(key) || { group, count: 0 };
+        entry.count += 1;
+        usedQTHs.set(key, entry);
+      });
+
+      const qthPlacemarks = [];
+      const lineStyles = [];
+      usedQTHs.forEach((entry, key) => {
+        const g = entry.group;
+        const id = 'qth' + g.index;
+        lineStyles.push(
+          `<Style id="${id}"><LineStyle><color>${cssToKmlColor(g.color, 'cc')}</color><width>1.5</width></LineStyle>` +
+          `<IconStyle><color>${cssToKmlColor(g.color)}</color><scale>1.2</scale>` +
+          `<Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>`);
+        qthPlacemarks.push(
+          `<Placemark><name>${xmlEscape(g.label)}</name>` +
+          `<description>QSOs from here: ${entry.count}</description>` +
+          `<styleUrl>#${id}</styleUrl>` +
+          `<Point><coordinates>${g.lon},${g.lat},0</coordinates></Point></Placemark>`);
+      });
+
+      const contactPlacemarks = [];
+      const pathPlacemarks = [];
+      qsos.forEach(q => {
+        let lat = q.lat, lon = q.lon;
+        if ((!lat || !lon) && q.gridsquare) {
+          const b = maidenheadToLatLon(q.gridsquare);
+          if (b) { lat = b.center[0]; lon = b.center[1]; }
+        }
+        if (!lat || !lon) return;
+        const desc = [
+          q.band ? `Band: ${q.band}` : '', q.mode ? `Mode: ${q.mode}` : '',
+          q.qso_date ? `Date: ${q.qso_date}` : '', q.time_on ? `Time: ${q.time_on}` : '',
+          q.gridsquare ? `Grid: ${q.gridsquare}` : '', q.state ? `State: ${q.state}` : '',
+          q.country ? `Country: ${q.country}` : '',
+          q.distance ? `Distance: ${q.distance} mi` : ''
+        ].filter(Boolean).join('\n');
+        contactPlacemarks.push(
+          `<Placemark><name>${xmlEscape(q.call)}</name>` +
+          `<description>${xmlEscape(desc)}</description>` +
+          `<Point><coordinates>${lon},${lat},0</coordinates></Point></Placemark>`);
+
+        const key = qthKeyOf(q);
+        const group = key ? qthIndex.get(key) : null;
+        if (group) {
+          pathPlacemarks.push(
+            `<Placemark><name>${xmlEscape((group.label || '') + ' → ' + (q.call || ''))}</name>` +
+            `<styleUrl>#qth${group.index}</styleUrl>` +
+            `<LineString><tessellate>1</tessellate>` +
+            `<coordinates>${group.lon},${group.lat},0 ${lon},${lat},0</coordinates></LineString></Placemark>`);
+        }
+      });
+
+      const kml =
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>` +
+        `<name>Rayfall QSO map</name>` +
+        lineStyles.join('') +
+        (qthPlacemarks.length ? `<Folder><name>QTHs</name>${qthPlacemarks.join('')}</Folder>` : '') +
+        `<Folder><name>Contacts</name>${contactPlacemarks.join('')}</Folder>` +
+        (pathPlacemarks.length ? `<Folder><name>QSO paths</name>${pathPlacemarks.join('')}</Folder>` : '') +
+        `</Document></kml>`;
+
+      const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().split('T')[0];
+      link.download = `rayfall-map-${timestamp}.kml`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
     }
 
     // ---- Share / embed ----
