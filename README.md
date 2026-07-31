@@ -1,5 +1,3 @@
-#
-
 <p align="center">
   <img src="static/rayfall.png" alt="RayfallLogo" height="100">
 </p>
@@ -18,7 +16,7 @@ Rayfall is a dynamic ham radio mapping interface that pulls your logbook data fr
 * **Interactive Leaflet Map**
 * **Multiple import methods:**
   * QRZ API integration (supports multiple logbooks)
-  * **NEW:** ADI/ADIF file import (no API key required!)
+  * ADI/ADIF file import (no API key required!)
 * **Date range selection**
 * **Color-coded pins by band or by QTH**
 * **Multi-QTH support:** logs that span multiple locations (travel, POTA, Field Day) get a separate marker per QTH, plus a QTH filter row and per-QSO "From QTH" info
@@ -27,13 +25,16 @@ Rayfall is a dynamic ham radio mapping interface that pulls your logbook data fr
   * QTH station icons: clean shapes (dot, plus, square, signal) or emoji, with a color picker and optional grid label
   * Custom grid square colors and opacity
   * Multiple basemap styles
+  * Optional on-map legend for band/QTH colors
 * **Grid square overlay with 4/6-character precision**
 * **Map lines from each QTH to its QSOs (toggle on/off)**
 * **Filter QSOs by band, mode, or originating QTH**
-* **High-resolution map export (300 DPI for printing)**
+* **High-resolution map export (300 DPI for printing),** with an optional **Select Export Area** to crop the capture to exactly the region you drag out
+* **KML export** — open your QTHs, contacts, and QSO paths in Google Earth for a free-zoom overview of a whole-world log
+* **Share & embed** — publish a read-only snapshot link (`rayfall.me/m/...`), embed the live map in forums or websites with an iframe, or download the preview image for your QRZ page
+* **Hide Controls** — collapse the whole header so the map fills the window (great on notebook screens)
 * **Auto-reads your QTH(s) from log data** (`MY_GRIDSQUARE`, `MY_LAT`/`MY_LON`)
-* **Clean dropdown menu for display options**
-* **Works offline with ADI files**
+* **Works offline with ADI files** — import, map, and export (JPEG/KML) without an internet-dependent backend
 
 ---
 
@@ -101,7 +102,7 @@ This starts the server locally at: `http://127.0.0.1:8000`
 4. Choose a start and end date and click **Load from QRZ**.
 5. Filter contacts by band/mode and customize display options.
 
-### Method 2: ADI File Import (Offline) 🆕
+### Method 2: ADI File Import (Offline)
 
 1. Visit `http://127.0.0.1:8000` in your browser.
 2. Click **"Import ADI File"** and select your `.adi` or `.adif` file.
@@ -110,7 +111,7 @@ This starts the server locally at: `http://127.0.0.1:8000`
 
 **See [QUICK_START_ADI.md](QUICK_START_ADI.md) for detailed ADI import guide.**
 
-### Display Customization 🆕
+### Display Customization
 
 Click the **"⚙️ Display Options"** button to access:
 - **Map Style**: Light, Dark, Topographic, Satellite, Streets
@@ -119,7 +120,13 @@ Click the **"⚙️ Display Options"** button to access:
 - **Pin Style**: Teardrop, Circle, Square, or Star markers
 - **Grid Squares**: Custom colors, opacity, and precision (4 or 6 chars)
 
-All contacts with grid squares or lat/lon information will be plotted.
+All contacts with grid squares or lat/lon information will be plotted. Need more room for the map? **⏶ Hide Controls** (top-right) collapses the header; the floating **⚙️ Show Controls** chip brings it back.
+
+### Exporting & Sharing
+
+- **Export Map (300 DPI)** downloads a print-ready JPEG of the current view. Use **📐 Select Export Area** first to drag out exactly the region you want captured.
+- **🌍 Export KML** downloads your QTHs, contacts, and QSO paths (colored per QTH) for Google Earth — ideal for browsing a whole-world log at any zoom level. Respects your active filters and works offline.
+- **🔗 Share Map** publishes a read-only snapshot with a link, an iframe embed code, and a downloadable preview image (handy for QRZ pages, which block iframes).
 
 ### Need Help?
 
@@ -175,12 +182,12 @@ Edit the styles directly in the `<style>` block inside `index.html`. All control
 
 ```
 rayfall/
-├── main.py                 # FastAPI backend
+├── main.py                 # FastAPI backend (QRZ proxy, share/embed API, previews)
+├── render_preview.py       # Headless share-preview renderer (optional, needs Playwright)
 ├── templates/
-│   └── index.html          # Frontend map UI
-├── static/
-│   ├── rayfall.png         # Logo
-│   └── screenshot.png      # Screenshot
+│   └── index.html          # Frontend map UI (all CSS/JS lives here)
+├── static/                 # Logo, marker, and preview images
+├── data/                   # Created at runtime: shares DB + cached previews (gitignored)
 ├── requirements.txt        # Python dependencies
 └── README.md               # You're reading this
 ```
