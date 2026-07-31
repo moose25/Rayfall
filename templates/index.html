@@ -887,6 +887,7 @@
         View on GitHub
       </a>
     </div>
+    <div id="versionInfo" style="color: grey; font-size: 12px;"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -2117,10 +2118,38 @@
         .catch(e => { console.error('Failed to load shared map:', e); alert('This shared map could not be loaded.'); });
     }
 
+    function showVersion() {
+      const el = document.getElementById('versionInfo');
+      if (!el) return;
+      fetch('/api/version').then(r => r.ok ? r.json() : null).then(local => {
+        if (!local || !local.sha || local.sha === 'unknown') return;
+        const dateSuffix = local.date ? ` · ${local.date}` : '';
+        const repoUrl = 'https://github.com/moose25/Rayfall';
+        const shaLink = `<a href="${repoUrl}/commit/${local.sha}" target="_blank" rel="noopener" style="color:grey;text-decoration:none;">v ${local.sha}</a>`;
+        el.innerHTML = `${shaLink}${dateSuffix}`;
+
+        // Best-effort update check against GitHub's main branch. Fails silently
+        // on rate-limit or offline — the version chip still shows.
+        fetch(`https://api.github.com/repos/moose25/Rayfall/commits/main`)
+          .then(r => r.ok ? r.json() : null)
+          .then(remote => {
+            if (!remote || !remote.sha) return;
+            const remoteShort = remote.sha.substring(0, 7);
+            if (remoteShort === local.sha) {
+              el.innerHTML += ' · up to date';
+            } else {
+              el.innerHTML += ` · <a href="${repoUrl}/compare/${local.sha}...${remoteShort}" target="_blank" rel="noopener" style="color:#FFC300;text-decoration:none;">update available →</a>`;
+            }
+          })
+          .catch(() => {});
+      }).catch(() => {});
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       // Render the initial QTH icon preview so the default SVG shape shows in the sidebar.
       updateQTHIcon();
       bootstrapViewer();
+      showVersion();
     });
 
   </script>

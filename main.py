@@ -35,6 +35,27 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Use Jinja2 templates from templates/
 templates = Jinja2Templates(directory="templates")
 
+# Version metadata: read once at startup from the git working tree. Falls back
+# to "unknown" when git isn't available (e.g. a plain-source install).
+def _read_version():
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=BASE_DIR, stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        sha = "unknown"
+    try:
+        date = subprocess.check_output(
+            ["git", "log", "-1", "--format=%cs", "HEAD"],
+            cwd=BASE_DIR, stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        date = None
+    return {"sha": sha, "date": date}
+
+VERSION = _read_version()
+
 
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -192,6 +213,11 @@ def create_share(payload: SharePayload, request: Request, background_tasks: Back
         "preview_url": f"{root}/preview/{share_id}.png",
         "delete_token": delete_token,
     }
+
+
+@app.get("/api/version")
+def get_version():
+    return VERSION
 
 
 @app.get("/api/share/{share_id}")
