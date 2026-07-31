@@ -188,6 +188,14 @@
       cursor: crosshair !important;
     }
 
+    /* During export capture: kill Leaflet's tile fade-in. Tiles snapshotted
+       mid-transition render at partial opacity, leaving a visible brightness
+       seam between "old" and freshly loaded tiles in the JPEG. */
+    #map.exporting .leaflet-tile {
+      opacity: 1 !important;
+      transition: none !important;
+    }
+
     .map-legend {
       position: absolute;
       right: 12px;
@@ -1850,6 +1858,7 @@
       // html2canvas then filled the un-covered region with backgroundColor,
       // producing the leftover blue bar. position:fixed at (0,0) with an
       // explicit size guarantees the element is exactly print-size.
+      mapElement.classList.add('exporting');
       mapElement.style.position = 'fixed';
       mapElement.style.top = '0';
       mapElement.style.left = '0';
@@ -1869,6 +1878,7 @@
       }
 
       const cleanup = () => {
+        mapElement.classList.remove('exporting');
         mapElement.style.width = originalWidth;
         mapElement.style.height = originalHeight;
         mapElement.style.position = originalPosition;
@@ -1909,51 +1919,92 @@
           };
         });
 
-        // Compute pin bounding boxes (contact markers + QTH markers) so we
-        // can clip line drawing to avoid drawing over pins. This gives the
-        // visual effect of pins being on top of the lines, without needing
-        // a second html2canvas pass (which kept losing tiles or transparency).
-        const pinBounds = [];
-        const collectBounds = (m) => {
-          if (!m || !m.getLatLng) return;
-          const pt = map.latLngToContainerPoint(m.getLatLng());
-          const iconOpts = (m.options.icon && m.options.icon.options) || {};
-          const size = iconOpts.iconSize || [24, 24];
-          const anchor = iconOpts.iconAnchor || [size[0] / 2, size[1] / 2];
-          pinBounds.push({
-            x: pt.x - anchor[0],
-            y: pt.y - anchor[1],
-            w: size[0],
-            h: size[1]
-          });
+        // Snapshot every visible marker (contact pins, QTH markers, grid
+        // labels) so we can redraw them ON TOP of the lines after
+        // compositing — matching the live map's z-order (marker pane above
+        // overlay pane) without clip cutouts, which left boxy no-line zones
+        // around each pin. Chromium taints the canvas when an SVG image
+        // contains <foreignObject> (breaking toBlob), so each icon is
+        // decomposed instead: plain <svg> pieces are rasterised via
+        // same-origin blob images (taint-free), and text pieces (emoji
+        // icons, QTH/grid labels) are replayed with fillText using their
+        // computed styles. Positions come from getBoundingClientRect
+        // relative to the map element, so anchors and label offsets are
+        // exact for any pin variation.
+        const mapRect = mapElement.getBoundingClientRect();
+        const pinParts = [];
+        const snapshotIconDom = (el) => {
+          if (el.tagName && el.tagName.toLowerCase() === 'svg') {
+            const r = el.getBoundingClientRect();
+            pinParts.push({
+              type: 'svg',
+              markup: new XMLSerializer().serializeToString(el),
+              x: r.left - mapRect.left, y: r.top - mapRect.top,
+              w: r.width, h: r.height
+            });
+            return;
+          }
+          const kids = Array.from(el.children || []);
+          if (!kids.length) {
+            const text = (el.textContent || '').trim();
+            if (!text) return;
+            const r = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
+            pinParts.push({
+              type: 'text', text,
+              x: r.left - mapRect.left, y: r.top - mapRect.top,
+              w: r.width, h: r.height,
+              font: `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,
+              color: cs.color,
+              background: cs.backgroundColor,
+              radius: parseFloat(cs.borderRadius) || 0,
+              shadow: cs.textShadow !== 'none'
+            });
+            return;
+          }
+          kids.forEach(snapshotIconDom);
         };
-        markers.forEach(collectBounds);
-        qthMarkers.forEach(collectBounds);
+        const collectPin = (m) => {
+          if (m && m.getLatLng && m._icon && map.hasLayer(m)) snapshotIconDom(m._icon);
+        };
+        markers.forEach(collectPin);
+        qthMarkers.forEach(collectPin);
+        // Grid labels are divIcon markers too (rectangles in gridSquares lack
+        // _icon, so collectPin skips them); on the live map they sit above the
+        // lines, so redraw them on top as well.
+        gridSquares.forEach(collectPin);
+
+        const pinPiecePromises = pinParts.map(part => {
+          if (part.type !== 'svg') return Promise.resolve(part);
+          return new Promise(resolve => {
+            const url = URL.createObjectURL(new Blob([part.markup], { type: 'image/svg+xml' }));
+            const img = new Image();
+            img.onload = () => resolve(Object.assign({ img, url }, part));
+            img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+            img.src = url;
+          });
+        });
 
         const linesToRestore = lines.slice();
         linesToRestore.forEach(l => map.removeLayer(l));
 
-        html2canvas(mapElement, {
-          useCORS: true,
-          allowTaint: true,
-          scale: 1,
-          width: printWidth,
-          height: printHeight,
-          backgroundColor: '#171c3a'
-        }).then(finalCanvas => {
+        Promise.all([
+          html2canvas(mapElement, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 1,
+            width: printWidth,
+            height: printHeight,
+            backgroundColor: '#171c3a'
+          }),
+          Promise.all(pinPiecePromises)
+        ]).then(([finalCanvas, pinPieces]) => {
           const ctx = finalCanvas.getContext('2d');
 
-          // Draw lines with a clip region that excludes pin bounds, so lines
-          // visually stop at the pin edges — same appearance as if pins were
-          // rendered on top. html2canvas at scale:1 produces a canvas whose
-          // dimensions match the element's rect, so container coords map 1:1.
+          // Draw the lines over the captured tiles. html2canvas at scale:1
+          // produces a canvas whose dimensions match the element's rect, so
+          // container coords map 1:1.
           ctx.save();
-          if (pinBounds.length) {
-            ctx.beginPath();
-            ctx.rect(0, 0, finalCanvas.width, finalCanvas.height);
-            pinBounds.forEach(b => ctx.rect(b.x, b.y, b.w, b.h));
-            ctx.clip('evenodd');
-          }
           lineSnapshots.forEach(l => {
             if (l.points.length < 2) return;
             ctx.strokeStyle = l.color;
@@ -1969,6 +2020,37 @@
             ctx.stroke();
           });
           ctx.restore();
+
+          // Now redraw the pin pieces above the lines, in DOM order. The
+          // captured pins are still underneath (exactly covered), so a piece
+          // that fails to rasterise just falls back to the captured pin.
+          pinPieces.filter(Boolean).forEach(part => {
+            if (part.type === 'svg') {
+              ctx.drawImage(part.img, part.x, part.y, part.w, part.h);
+              URL.revokeObjectURL(part.url);
+              return;
+            }
+            ctx.save();
+            if (part.background && part.background !== 'rgba(0, 0, 0, 0)' && part.background !== 'transparent') {
+              ctx.fillStyle = part.background;
+              ctx.beginPath();
+              if (ctx.roundRect) ctx.roundRect(part.x, part.y, part.w, part.h, part.radius);
+              else ctx.rect(part.x, part.y, part.w, part.h);
+              ctx.fill();
+            }
+            if (part.shadow) {
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+              ctx.shadowBlur = 3;
+              ctx.shadowOffsetX = 1;
+              ctx.shadowOffsetY = 1;
+            }
+            ctx.fillStyle = part.color;
+            ctx.font = part.font;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(part.text, part.x + part.w / 2, part.y + part.h / 2);
+            ctx.restore();
+          });
           return finalCanvas;
         }).then(finalCanvas => {
           // Put the polylines back on the live map before we hand the JPEG
