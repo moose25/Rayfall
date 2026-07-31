@@ -528,6 +528,28 @@
       }
     }
 
+    /* ===== Collapsible controls (more map on small screens) ===== */
+    body.controls-collapsed .header-container { display: none; }
+
+    .controls-expand-chip {
+      display: none;
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      z-index: 1100;
+      background: rgba(23, 28, 58, 0.9);
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 13px;
+      color: #FFC300;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .controls-expand-chip:hover { background: #3a4177; }
+    body.controls-collapsed .controls-expand-chip { display: block; }
+    body[data-mode="embed"] .controls-expand-chip { display: none !important; }
+
     /* ===== Share / view / embed additions ===== */
     body[data-mode="view"] .edit-only,
     body[data-mode="embed"] .edit-only { display: none !important; }
@@ -869,7 +891,10 @@
   <div class="top-right-buttons">
     <button onclick="openHelpModal()">📖 How to Use Rayfall</button>
     <button class="edit-only" onclick="openApiModal()">🔑 Change API Key</button>
+    <button onclick="toggleControls()" title="Give the map the full window">⏶ Hide Controls</button>
   </div>
+
+  <button class="controls-expand-chip" onclick="toggleControls()">⚙️ Show Controls</button>
 
 
   <div id="map">
@@ -2457,11 +2482,31 @@
       }).catch(() => {});
     }
 
+    // ---- Collapsible controls ----
+    // Hides the whole header (settings + filters) so the map gets the full
+    // window — on a notebook screen the control area eats a third of the
+    // height. Persisted per-browser; a floating chip brings it back.
+    function applyControlsCollapsed(collapsed) {
+      document.body.classList.toggle('controls-collapsed', collapsed);
+      try { localStorage.setItem('rayfallControlsCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+      // Leaflet needs to re-measure its container after the layout change.
+      setTimeout(() => map.invalidateSize(), 50);
+    }
+
+    function toggleControls() {
+      applyControlsCollapsed(!document.body.classList.contains('controls-collapsed'));
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       // Render the initial QTH icon preview so the default SVG shape shows in the sidebar.
       updateQTHIcon();
       bootstrapViewer();
       showVersion();
+      if (document.body.getAttribute('data-mode') !== 'embed') {
+        try {
+          if (localStorage.getItem('rayfallControlsCollapsed') === '1') applyControlsCollapsed(true);
+        } catch (e) {}
+      }
     });
 
   </script>
