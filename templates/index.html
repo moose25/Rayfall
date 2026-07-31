@@ -1882,6 +1882,19 @@
       };
 
       const doCapture = () => {
+        // Force Leaflet's SVG vector layers (polylines, rectangles) to redraw
+        // with the current projection. DOM markers (pins, QTH icons) reproject
+        // instantly via CSS on view change, but SVG path `d` attributes only
+        // update on the next animation frame — html2canvas can snapshot while
+        // paths still hold coordinates from the pre-fitBounds view, which is
+        // why exports showed QSO lines converging on the wrong location while
+        // the pins were correct (issue #19).
+        map.eachLayer(layer => {
+          if (typeof layer.redraw === 'function') {
+            try { layer.redraw(); } catch (e) { /* non-fatal */ }
+          }
+        });
+
         html2canvas(mapElement, {
           useCORS: true,
           allowTaint: true,
