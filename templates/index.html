@@ -36,13 +36,24 @@
 
     .footer-container {
       background-color: #171c3a;
-      padding: 8px 0;
+      padding: 6px 12px;
       text-align: center;
       border-top: 1px solid #2c2f5e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 12px;
+      color: grey;
     }
 
-    .footer-container div {
-      margin: 3px 0;
+    .footer-container > * {
+      margin: 0;
+    }
+
+    .footer-container .sep {
+      color: #444;
     }
 
     h1, h2, h3, label, p {
@@ -879,15 +890,10 @@
   </div>
 
   <div class="footer-container">
-    <div style="color:grey; font-size:13px;">
-      Created by N2CLW
-    </div>
-    <div style="color: grey; font-size: 13px;">
-      <a href="https://github.com/moose25/rayfall" target="_blank" style="color: grey; text-decoration: none;">
-        View on GitHub
-      </a>
-    </div>
-    <div id="versionInfo" style="color: grey; font-size: 12px;"></div>
+    <span>Created by N2CLW</span>
+    <span class="sep">·</span>
+    <a href="https://github.com/moose25/Rayfall" target="_blank" rel="noopener" style="color: grey; text-decoration: none;">View on GitHub</a>
+    <span id="versionInfo"></span>
   </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -2123,25 +2129,55 @@
     function showVersion() {
       const el = document.getElementById('versionInfo');
       if (!el) return;
+      const repoUrl = 'https://github.com/moose25/Rayfall';
+      const grey = 'color:grey;text-decoration:none;';
+      const yellow = 'color:#FFC300;text-decoration:none;';
+
       fetch('/api/version').then(r => r.ok ? r.json() : null).then(local => {
         if (!local || !local.sha || local.sha === 'unknown') return;
-        const dateSuffix = local.date ? ` · ${local.date}` : '';
-        const repoUrl = 'https://github.com/moose25/Rayfall';
-        const shaLink = `<a href="${repoUrl}/commit/${local.sha}" target="_blank" rel="noopener" style="color:grey;text-decoration:none;">v ${local.sha}</a>`;
-        el.innerHTML = `${shaLink}${dateSuffix}`;
 
-        // Best-effort update check against GitHub's main branch. Fails silently
-        // on rate-limit or offline — the version chip still shows.
-        fetch(`https://api.github.com/repos/moose25/Rayfall/commits/main`)
+        // Prefer the release tag when HEAD is exactly on one; when it's past a
+        // tag show "v1.0.0+3 (abc1234)"; otherwise fall back to just the SHA.
+        let label, targetUrl;
+        if (local.tag && local.commits_since_tag === 0) {
+          label = local.tag;
+          targetUrl = `${repoUrl}/releases/tag/${local.tag}`;
+        } else if (local.tag) {
+          label = `${local.tag}+${local.commits_since_tag} (${local.sha})`;
+          targetUrl = `${repoUrl}/commit/${local.sha}`;
+        } else {
+          label = `v ${local.sha}`;
+          targetUrl = `${repoUrl}/commit/${local.sha}`;
+        }
+        const dateSuffix = local.date ? ` · ${local.date}` : '';
+        el.innerHTML = ` <span class="sep">·</span> <a href="${targetUrl}" target="_blank" rel="noopener" style="${grey}">${label}</a>${dateSuffix}`;
+
+        // Best-effort update check. Prefer /releases/latest so the compare
+        // target is a real release; fall back to comparing commits when no
+        // releases exist yet. Fails silently on rate-limit / offline.
+        fetch(`https://api.github.com/repos/moose25/Rayfall/releases/latest`)
           .then(r => r.ok ? r.json() : null)
-          .then(remote => {
-            if (!remote || !remote.sha) return;
-            const remoteShort = remote.sha.substring(0, 7);
-            if (remoteShort === local.sha) {
-              el.innerHTML += ' · up to date';
-            } else {
-              el.innerHTML += ` · <a href="${repoUrl}/compare/${local.sha}...${remoteShort}" target="_blank" rel="noopener" style="color:#FFC300;text-decoration:none;">update available →</a>`;
+          .then(release => {
+            if (release && release.tag_name) {
+              if (local.tag === release.tag_name && local.commits_since_tag === 0) {
+                el.innerHTML += ' <span class="sep">·</span> up to date';
+              } else {
+                el.innerHTML += ` <span class="sep">·</span> <a href="${release.html_url}" target="_blank" rel="noopener" style="${yellow}">${release.tag_name} available →</a>`;
+              }
+              return;
             }
+            // No releases yet — fall back to commit-level check.
+            return fetch(`https://api.github.com/repos/moose25/Rayfall/commits/main`)
+              .then(r => r.ok ? r.json() : null)
+              .then(remote => {
+                if (!remote || !remote.sha) return;
+                const remoteShort = remote.sha.substring(0, 7);
+                if (remoteShort === local.sha) {
+                  el.innerHTML += ' <span class="sep">·</span> up to date';
+                } else {
+                  el.innerHTML += ` <span class="sep">·</span> <a href="${repoUrl}/compare/${local.sha}...${remoteShort}" target="_blank" rel="noopener" style="${yellow}">update available →</a>`;
+                }
+              });
           })
           .catch(() => {});
       }).catch(() => {});
