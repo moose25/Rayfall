@@ -65,7 +65,10 @@
       background-color: #171c3a;
       padding: 8px 10px;
       position: relative;
-      min-height: 90px;
+      /* Tall enough for the three stacked top-right buttons (3 x ~30px
+         + gaps + offset), which are absolutely positioned and so don't
+         stretch the header themselves. Padding adds to this (content-box). */
+      min-height: 110px;
       padding-right: 220px; /* Make room for top-right buttons */
     }
 
@@ -450,7 +453,9 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      z-index: 100;
+      /* Above Leaflet's panes/controls so the buttons float over the map
+         instead of rendering behind it if they ever overflow the header. */
+      z-index: 1100;
       max-width: 200px;
     }
 
