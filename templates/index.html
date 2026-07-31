@@ -1884,14 +1884,16 @@
 
       const doCapture = () => {
         // Force Leaflet's SVG vector layers (polylines, rectangles) to redraw
-        // with the current projection. DOM markers (pins, QTH icons) reproject
-        // instantly via CSS on view change, but SVG path `d` attributes only
-        // update on the next animation frame — html2canvas can snapshot while
-        // paths still hold coordinates from the pre-fitBounds view, which is
-        // why exports showed QSO lines converging on the wrong location while
-        // the pins were correct (issue #19).
+        // with the current projection so html2canvas sees up-to-date path
+        // coordinates. DOM markers reproject instantly via CSS but SVG path
+        // `d` attributes lag by an animation frame (issue #19).
+        //
+        // Only Path subclasses — do NOT call redraw() on TileLayer. On tile
+        // layers `redraw()` removes every tile and re-fetches it, which put
+        // the exporter back in the "empty white tiles + wrong-positioned
+        // vectors" state we already fixed in earlier PRs.
         map.eachLayer(layer => {
-          if (typeof layer.redraw === 'function') {
+          if (layer instanceof L.Path) {
             try { layer.redraw(); } catch (e) { /* non-fatal */ }
           }
         });
