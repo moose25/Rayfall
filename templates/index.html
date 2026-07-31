@@ -996,6 +996,24 @@
       qthIndex = new Map();
       Array.from(groups.keys()).sort().forEach((key, idx) => {
         const g = groups.get(key);
+        // Canonical position: only trust the per-QSO MY_LAT/MY_LON when it
+        // actually falls inside the QTH's grid square. QRZ backfills
+        // MY_LAT/MY_LON from the station's *current* profile onto every
+        // record, so a multi-QTH log arrives with several distinct
+        // MY_GRIDSQUAREs but one shared coordinate pair — which stacked all
+        // QTH markers (and every line origin) on a single point (#31).
+        // When coords and grid disagree, snap to the grid centre.
+        if (g.grid) {
+          const b = maidenheadToLatLon(g.grid);
+          if (b) {
+            const inCell = g.lat >= b.latMin && g.lat <= b.latMax &&
+                           g.lon >= b.lonMin && g.lon <= b.lonMax;
+            if (!inCell) {
+              g.lat = b.center[0];
+              g.lon = b.center[1];
+            }
+          }
+        }
         g.color = QTH_PALETTE[idx % QTH_PALETTE.length];
         g.index = idx;
         qthIndex.set(key, g);
@@ -1374,8 +1392,14 @@
         // Match line color to the pin when "Color Pins by QTH" is on so each
         // contact's line visually ties back to its originating station.
         const lineColor = (useQTHColor && qthGroup) ? qthGroup.color : "grey";
+        // Draw from the QTH group's canonical position, not the raw per-QSO
+        // coords. Within one QTH the raw values mix precise coordinates and
+        // grid-derived centres, so lines fanned out from several nearby
+        // points instead of converging on the QTH marker (#26).
+        const originLat = qthGroup ? qthGroup.lat : qso.my_lat;
+        const originLon = qthGroup ? qthGroup.lon : qso.my_lon;
         const outline = L.polyline(
-          [[qso.my_lat, qso.my_lon], [markerLat, markerLon]],
+          [[originLat, originLon], [markerLat, markerLon]],
             { color: lineColor, weight: 2, opacity: 1 }
         ).addTo(map);
         lines.push(outline);
