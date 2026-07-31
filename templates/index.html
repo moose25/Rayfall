@@ -1908,20 +1908,30 @@
             opacity: l.options.opacity != null ? l.options.opacity : 1
           };
         });
+
+        // Compute pin bounding boxes (contact markers + QTH markers) so we
+        // can clip line drawing to avoid drawing over pins. This gives the
+        // visual effect of pins being on top of the lines, without needing
+        // a second html2canvas pass (which kept losing tiles or transparency).
+        const pinBounds = [];
+        const collectBounds = (m) => {
+          if (!m || !m.getLatLng) return;
+          const pt = map.latLngToContainerPoint(m.getLatLng());
+          const iconOpts = (m.options.icon && m.options.icon.options) || {};
+          const size = iconOpts.iconSize || [24, 24];
+          const anchor = iconOpts.iconAnchor || [size[0] / 2, size[1] / 2];
+          pinBounds.push({
+            x: pt.x - anchor[0],
+            y: pt.y - anchor[1],
+            w: size[0],
+            h: size[1]
+          });
+        };
+        markers.forEach(collectBounds);
+        qthMarkers.forEach(collectBounds);
+
         const linesToRestore = lines.slice();
         linesToRestore.forEach(l => map.removeLayer(l));
-
-        // Two-pass capture so the z-order in the JPEG matches the live map
-        // (tiles → lines → pins). If we did a single capture and drew lines
-        // afterward, the lines would sit on top of pins.
-        //
-        // Pass 1: capture with the marker pane excluded → tiles only (SVG
-        // overlay-pane paths were already stripped by removing polylines from
-        // the map above).
-        // Pass 2: capture with the tile pane excluded and a transparent
-        // background → pins only, ready to composite on top.
-        const excludeClass = (cls) => (el) =>
-          el.classList && el.classList.contains(cls);
 
         html2canvas(mapElement, {
           useCORS: true,
@@ -1929,17 +1939,23 @@
           scale: 1,
           width: printWidth,
           height: printHeight,
-          backgroundColor: '#171c3a',
-          ignoreElements: excludeClass('leaflet-marker-pane')
-        }).then(tilesCanvas => {
-          const ctx = tilesCanvas.getContext('2d');
+          backgroundColor: '#171c3a'
+        }).then(finalCanvas => {
+          const ctx = finalCanvas.getContext('2d');
 
-          // Draw lines onto the tiles canvas. html2canvas at scale:1 produces
-          // a canvas whose dimensions match the element's rect, so container
-          // coords map 1:1.
+          // Draw lines with a clip region that excludes pin bounds, so lines
+          // visually stop at the pin edges — same appearance as if pins were
+          // rendered on top. html2canvas at scale:1 produces a canvas whose
+          // dimensions match the element's rect, so container coords map 1:1.
+          ctx.save();
+          if (pinBounds.length) {
+            ctx.beginPath();
+            ctx.rect(0, 0, finalCanvas.width, finalCanvas.height);
+            pinBounds.forEach(b => ctx.rect(b.x, b.y, b.w, b.h));
+            ctx.clip('evenodd');
+          }
           lineSnapshots.forEach(l => {
             if (l.points.length < 2) return;
-            ctx.save();
             ctx.strokeStyle = l.color;
             ctx.lineWidth = l.weight;
             ctx.globalAlpha = l.opacity;
@@ -1951,22 +1967,9 @@
               ctx.lineTo(l.points[i].x, l.points[i].y);
             }
             ctx.stroke();
-            ctx.restore();
           });
-
-          // Pass 2: pins on transparent background.
-          return html2canvas(mapElement, {
-            useCORS: true,
-            allowTaint: true,
-            scale: 1,
-            width: printWidth,
-            height: printHeight,
-            backgroundColor: null,
-            ignoreElements: excludeClass('leaflet-tile-pane')
-          }).then(pinsCanvas => {
-            ctx.drawImage(pinsCanvas, 0, 0);
-            return tilesCanvas;
-          });
+          ctx.restore();
+          return finalCanvas;
         }).then(finalCanvas => {
           // Put the polylines back on the live map before we hand the JPEG
           // to the browser.
