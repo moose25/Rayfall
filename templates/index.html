@@ -534,7 +534,10 @@
     }
 
     /* ===== Collapsible controls (more map on small screens) ===== */
-    body.controls-collapsed .header-container { display: none; }
+    /* The top-right button stack is a body-level absolute element, not a
+       child of the header, so it must be hidden explicitly too. */
+    body.controls-collapsed .header-container,
+    body.controls-collapsed .top-right-buttons { display: none; }
 
     .controls-expand-chip {
       display: none;
