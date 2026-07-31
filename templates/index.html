@@ -1911,18 +1911,32 @@
         const linesToRestore = lines.slice();
         linesToRestore.forEach(l => map.removeLayer(l));
 
+        // Two-pass capture so the z-order in the JPEG matches the live map
+        // (tiles → lines → pins). If we did a single capture and drew lines
+        // afterward, the lines would sit on top of pins.
+        //
+        // Pass 1: capture with the marker pane excluded → tiles only (SVG
+        // overlay-pane paths were already stripped by removing polylines from
+        // the map above).
+        // Pass 2: capture with the tile pane excluded and a transparent
+        // background → pins only, ready to composite on top.
+        const excludeClass = (cls) => (el) =>
+          el.classList && el.classList.contains(cls);
+
         html2canvas(mapElement, {
           useCORS: true,
           allowTaint: true,
           scale: 1,
           width: printWidth,
           height: printHeight,
-          backgroundColor: '#171c3a'
-        }).then(canvas => {
-          // Redraw lines onto the captured canvas at their known pixel
-          // positions. html2canvas at scale:1 produces a canvas whose
-          // dimensions match the element's rect, so container coords map 1:1.
-          const ctx = canvas.getContext('2d');
+          backgroundColor: '#171c3a',
+          ignoreElements: excludeClass('leaflet-marker-pane')
+        }).then(tilesCanvas => {
+          const ctx = tilesCanvas.getContext('2d');
+
+          // Draw lines onto the tiles canvas. html2canvas at scale:1 produces
+          // a canvas whose dimensions match the element's rect, so container
+          // coords map 1:1.
           lineSnapshots.forEach(l => {
             if (l.points.length < 2) return;
             ctx.save();
@@ -1940,11 +1954,25 @@
             ctx.restore();
           });
 
+          // Pass 2: pins on transparent background.
+          return html2canvas(mapElement, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 1,
+            width: printWidth,
+            height: printHeight,
+            backgroundColor: null,
+            ignoreElements: excludeClass('leaflet-tile-pane')
+          }).then(pinsCanvas => {
+            ctx.drawImage(pinsCanvas, 0, 0);
+            return tilesCanvas;
+          });
+        }).then(finalCanvas => {
           // Put the polylines back on the live map before we hand the JPEG
           // to the browser.
           linesToRestore.forEach(l => l.addTo(map));
 
-          canvas.toBlob(blob => {
+          finalCanvas.toBlob(blob => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             const timestamp = new Date().toISOString().split('T')[0];
