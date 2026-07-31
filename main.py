@@ -52,7 +52,30 @@ def _read_version():
         ).decode().strip()
     except Exception:
         date = None
-    return {"sha": sha, "date": date}
+    tag = None
+    commits_since_tag = 0
+    try:
+        # e.g. "v1.0.0" if HEAD is on the tag, or "v1.0.0-3-gabc1234" if 3
+        # commits past. --tags allows lightweight tags; --always falls back to
+        # the SHA when no tag is reachable.
+        describe = subprocess.check_output(
+            ["git", "describe", "--tags", "--long", "--always"],
+            cwd=BASE_DIR, stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        # Only parse as a version if it looks like one (starts with v<digit>).
+        if describe.startswith("v") and "-" in describe:
+            parts = describe.rsplit("-", 2)  # ["v1.0.0", "3", "gabc1234"]
+            if len(parts) == 3 and parts[1].isdigit():
+                tag = parts[0]
+                commits_since_tag = int(parts[1])
+    except Exception:
+        pass
+    return {
+        "sha": sha,
+        "date": date,
+        "tag": tag,
+        "commits_since_tag": commits_since_tag,
+    }
 
 VERSION = _read_version()
 
