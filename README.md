@@ -86,6 +86,35 @@ uvicorn main:app --reload
 
 This starts the server locally at: `http://127.0.0.1:8000`
 
+#### Port already in use?
+
+Rayfall uses port **8000** by default. If that port is taken by another app,
+the server won't start and you'll see an error:
+
+* **Windows:** `[WinError 10013] ... an attempt was made to access a socket ...`
+  (or `10048`)
+* **macOS / Linux:** `[Errno 48] Address already in use`
+
+Check whether a port is free, then run Rayfall on a free one with `--port`:
+
+```bash
+# See what's using a port (example: 8000)
+# Windows:
+netstat -ano | findstr :8000
+# macOS / Linux:
+lsof -i :8000
+
+# Start Rayfall on a different port, e.g. 8001
+uvicorn main:app --reload --port 8001
+```
+
+Then open the matching URL, e.g. `http://127.0.0.1:8001`.
+
+> **Tip (Windows):** port 8000 can also fall inside a reserved range claimed by
+> Hyper-V / WSL / Docker, which blocks it even when nothing is listening. List
+> reserved ranges with `netsh int ipv4 show excludedportrange protocol=tcp` and
+> pick a port outside them.
+
 ---
 
 ## Updating
