@@ -195,6 +195,18 @@ rayfall/
 ---
 
 
+## Maintenance Banner
+
+Show a site-wide banner during updates or outages. State lives in `data/maintenance.json`
+and is read per request, so toggling it takes effect without restarting the app (open
+pages pick it up within ~60s; new loads immediately).
+
+```bash
+./maintenance.sh on "Back in 10 minutes while we deploy"   # enable (custom message optional)
+./maintenance.sh off                                       # disable
+./maintenance.sh status                                    # show current state
+```
+
 ## Contributing
 
 Pull requests and forks are welcome! If you find a bug or want to suggest a feature, feel free to open an issue or PR.
