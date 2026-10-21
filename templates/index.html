@@ -2538,7 +2538,10 @@
           .then(r => r.ok ? r.json() : null)
           .then(release => {
             if (release && release.tag_name) {
-              if (local.tag === release.tag_name && local.commits_since_tag === 0) {
+              // Having the latest release's tag means you're at it or ahead of
+              // it (extra commits merged since the tag). Either way you're up
+              // to date — only a *different* tag means a newer release to grab.
+              if (local.tag === release.tag_name) {
                 el.innerHTML += ' <span class="sep">·</span> up to date';
               } else {
                 el.innerHTML += ` <span class="sep">·</span> <a href="${release.html_url}" target="_blank" rel="noopener" style="${yellow}">${release.tag_name} available →</a>`;
