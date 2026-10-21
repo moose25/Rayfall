@@ -1142,9 +1142,11 @@
     fetch(`/api/logs?start=${start}&end=${end}`, {
         headers: { "x-api-key": apiKey }
     })
-        .then(res => {
+        .then(async res => {
         if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
+            let msg = `HTTP error! status: ${res.status}`;
+            try { const e = await res.json(); if (e && e.detail) msg = e.detail; } catch (_) {}
+            throw new Error(msg);
         }
         return res.json();
         })
