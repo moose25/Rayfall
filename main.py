@@ -387,35 +387,58 @@ def get_logs(
     end_datetime = f"{end}T23:59:59"
 
     command = [
-        "curl", "-X", "POST", "https://logbook.qrz.com/api",
+        "curl", "-sS",
+        "--connect-timeout", "10",
+        "--max-time", "30",
+        "-X", "POST", "https://logbook.qrz.com/api",
         "-d", f"KEY={x_api_key}",
         "-d", "ACTION=FETCH",
         "-d", f"OPTION=BETWEEN:{start}+{end}"
     ]
 
+    # curl exit codes that mean "couldn't reach QRZ" rather than a bad request:
+    # 6 = couldn't resolve host, 7 = couldn't connect, 28 = operation timed out,
+    # 35 = TLS handshake failed.
+    UNREACHABLE = {6, 7, 28, 35}
+
     try:
-        result = subprocess.run(command, capture_output=True, text=False, check=True)
-        output = result.stdout.decode("latin-1").strip()
+        result = subprocess.run(
+            command, capture_output=True, text=False, timeout=35
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=504,
+            detail="QRZ did not respond in time. It may be down — try again later.",
+        )
 
-        if "RESULT=FAIL" in output or "COUNT=0" in output:
-            return {
-                "message": "No QSOs found or QRZ rejected request",
-                "response": output
-            }
+    if result.returncode != 0:
+        stderr = (result.stderr or b"").decode("utf-8", "replace").strip()
+        if result.returncode in UNREACHABLE:
+            raise HTTPException(
+                status_code=502,
+                detail="Could not reach QRZ (logbook.qrz.com). The service may be "
+                       "down — try again later.",
+            )
+        raise HTTPException(
+            status_code=502,
+            detail=f"QRZ request failed (curl exit {result.returncode}). {stderr}".strip(),
+        )
 
-        # Clean escaped characters
-        output = output.replace("&gt;", ">").replace("&lt;", "<").replace("&amp;", "&")
+    output = result.stdout.decode("latin-1").strip()
 
-        # Parse only the fields we want
-        parsed_qsos = parse_adif_block(output)
-
+    if "RESULT=FAIL" in output or "COUNT=0" in output:
         return {
-            "count": len(parsed_qsos),
-            "qsos": parsed_qsos
+            "message": "No QSOs found or QRZ rejected request",
+            "response": output
         }
 
-    except subprocess.CalledProcessError as e:
-        return {
-            "error": "Curl failed",
-            "detail": e.stderr
-        }
+    # Clean escaped characters
+    output = output.replace("&gt;", ">").replace("&lt;", "<").replace("&amp;", "&")
+
+    # Parse only the fields we want
+    parsed_qsos = parse_adif_block(output)
+
+    return {
+        "count": len(parsed_qsos),
+        "qsos": parsed_qsos
+    }
