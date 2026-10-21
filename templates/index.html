@@ -193,6 +193,27 @@
       background: rgba(255, 255, 255, 0.18);
     }
 
+    .maint-banner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      position: sticky;
+      top: 0;
+      z-index: 1200;
+      padding: 10px 16px;
+      background: #FFC300;
+      color: #1a1a1a;
+      font-weight: 600;
+      font-size: 14px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+
+    .maint-banner.show { display: flex; }
+
+    .maint-banner .maint-icon { font-size: 16px; line-height: 1; }
+
+    body[data-mode="embed"] .maint-banner.show { display: none !important; }
+
     .color-dot {
       display: inline-block;
       width: 14px;
@@ -667,6 +688,10 @@
   </style>
 </head>
 <body data-mode="{{ mode or 'edit' }}" data-share-id="{{ share_id or '' }}">
+  <div id="maintBanner" class="maint-banner" role="status" aria-live="polite">
+    <span class="maint-icon">&#128296;</span>
+    <span id="maintMsg">Rayfall is undergoing maintenance.</span>
+  </div>
   <div class="header-container">
     <div class="logo-section">
       <img src="/static/rayfall.png" alt="Rayfall Logo" />
@@ -2552,9 +2577,33 @@
       applyControlsCollapsed(!document.body.classList.contains('controls-collapsed'));
     }
 
+    // ----- Maintenance banner -----
+    function applyMaintenance(state) {
+      const banner = document.getElementById('maintBanner');
+      if (!banner) return;
+      if (state && state.active) {
+        const msg = (state.message && state.message.trim())
+          ? state.message.trim()
+          : 'Rayfall is undergoing maintenance.';
+        document.getElementById('maintMsg').textContent = msg;
+        banner.classList.add('show');
+      } else {
+        banner.classList.remove('show');
+      }
+    }
+
+    function pollMaintenance() {
+      fetch('/api/maintenance', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(applyMaintenance)
+        .catch(() => {});
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       // Render the initial QTH icon preview so the default SVG shape shows in the sidebar.
       updateQTHIcon();
+      pollMaintenance();
+      setInterval(pollMaintenance, 60000);
       bootstrapViewer();
       showVersion();
       if (document.body.getAttribute('data-mode') !== 'embed') {

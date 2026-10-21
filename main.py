@@ -27,6 +27,9 @@ RENDER_PYTHON = os.path.join(BASE_DIR, ".render-venv", "bin", "python")
 RENDER_SCRIPT = os.path.join(BASE_DIR, "render_preview.py")
 RENDER_LOCAL_BASE = os.environ.get("RAYFALL_LOCAL_BASE", "http://127.0.0.1:8000")
 FALLBACK_IMAGE = os.path.join(BASE_DIR, "static", "rayfall.png")
+MAINTENANCE_FILE = os.environ.get(
+    "RAYFALL_MAINTENANCE_FILE", os.path.join(BASE_DIR, "data", "maintenance.json")
+)
 _render_lock = threading.Lock()
 
 # Mount static folder
@@ -241,6 +244,27 @@ def create_share(payload: SharePayload, request: Request, background_tasks: Back
 @app.get("/api/version")
 def get_version():
     return VERSION
+
+
+def read_maintenance():
+    """Current maintenance-banner state, read fresh from MAINTENANCE_FILE so it
+    can be toggled without restarting the app. Missing/invalid file = off."""
+    try:
+        with open(MAINTENANCE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (FileNotFoundError, ValueError, OSError):
+        return {"active": False, "message": ""}
+    if not isinstance(data, dict):
+        return {"active": False, "message": ""}
+    return {
+        "active": bool(data.get("active")),
+        "message": str(data.get("message") or ""),
+    }
+
+
+@app.get("/api/maintenance")
+def get_maintenance():
+    return read_maintenance()
 
 
 @app.get("/api/share/{share_id}")
