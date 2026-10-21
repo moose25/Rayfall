@@ -88,6 +88,42 @@ This starts the server locally at: `http://127.0.0.1:8000`
 
 ---
 
+## Updating
+
+To update an existing install to the latest version:
+
+### 1. Pull the Latest Code
+
+```bash
+cd rayfall
+git pull
+```
+
+### 2. Activate the Virtual Environment
+
+```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 3. Update Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Restart the Server
+
+Stop the running server (`Ctrl+C`) and start it again:
+
+```bash
+uvicorn main:app --reload
+```
+
+> **Note:** If you run Rayfall as a service (e.g. systemd), restart it with your
+> service manager instead — for example `sudo systemctl restart rayfall`.
+
+---
+
 ## Usage Instructions
 
 ### Getting Started
